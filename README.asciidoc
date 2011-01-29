@@ -1,0 +1,66 @@
+= libfitbit =
+
+by Kyle Machulis <kyle@nonpolynomial.com>
+
+Nonpolynomial Labs - http://www.nonpolynomial.com
+
+If you find libfitbit useful, please donate to the project at http://pledgie.com/campaigns/14375
+
+== Description ==
+
+libfitbit is an implementation of the data retrieval protocol for the
+fitbit health tracking device.
+
+== Package Information ==
+
+Source repo @ http://www.github.com/openyou/libfitbit
+
+== Library Requirements (For Compilation) ==
+
+* CMake (Required on all platforms) - http://www.cmake.org
+* Python (with dev libraries, for python lib) - http://www.python.org
+* libusb-1.0 (All non-windows platforms) - http://www.libusb.org
+
+To build on Ubuntu, you can pull the following packages to build the
+project from source.
+
+* libusb-1.0-0-dev
+* cmake
+* cmake-data
+
+== Build Notes ==
+
+To build the library from source, make a subdirectory in the source
+dir (called whatever you want), then go into that directory and run
+"cmake ..". This will generate the project files for your platform
+(makefiles for OS X and linux, visual studio for windows). For more
+information on project generators, look at the cmake documentation.
+
+== License ==
+
+---------------------
+Copyright (c) 2011, Kyle Machulis/Nonpolynomial Labs
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of the Kyle Machulis/Nonpolynomial Labs nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY Kyle Machulis/Nonpolynomial Labs ''AS IS'' AND ANY
+EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL Kyle Machulis/Nonpolynomial Labs BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
+---------------------
