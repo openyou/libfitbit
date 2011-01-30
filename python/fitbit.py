@@ -108,7 +108,7 @@ class ANT(object):
 
     def _check_ok_response(self):
         # response packets will always be 7 bytes
-        status = self._receive(7)        
+        status = self._receive(7)
 
         if status[2] == 0x40 and status[5] == 0x0:
             return
@@ -124,15 +124,15 @@ class ANT(object):
         self._check_reset_response()
 
     def set_channel_frequency(self, freq):
-        self._send_message(0x45, freq)
+        self._send_message(0x45, self._chan, freq)
         self._check_ok_response()
 
     def set_transmit_power(self, power):
-        self._send_message(0x47, power)
+        self._send_message(0x47, 0x0, power)
         self._check_ok_response()
 
     def set_search_timeout(self, timeout):
-        self._send_message(0x44, timeout)
+        self._send_message(0x44, self._chan, timeout)
         self._check_ok_response()
 
     def send_network_key(self, network, key):
@@ -140,11 +140,11 @@ class ANT(object):
         self._check_ok_response()
 
     def set_channel_period(self, period):
-        self._send_message(0x43, period)
+        self._send_message(0x43, self._chan, period)
         self._check_ok_response()
 
-    def set_channel_id(self):
-        self._send_message(0x51, self._chan, 0x00, 0x00, 0x00, 0x00)
+    def set_channel_id(self, id):
+        self._send_message(0x51, self._chan, id)
         self._check_ok_response()
 
     def open_channel(self):
@@ -228,7 +228,9 @@ class ANTlibusb(ANT):
 
 
     def _receive(self, size=64):
+        print "Trying to receive"
         r = self._connection.read(self.ep['in'], size, 0, 1000)
+        print r
         if self._debug:
             self.data_received(''.join(map(chr, r)))
         return r
@@ -271,8 +273,21 @@ class FitBit(ANTlibusb):
         self.send_acknowledged_data([0x78, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
     def check_receive_ready(self):
-        print self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
-        print self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
+
+    def wait_for_sync_request(self):
+        # FitBit device initialization
+        while 1:
+            try:
+                for i in range(0, 30):
+                    self.check_receive_ready()
+                    time.sleep(1)
+                d = self._receive(13)
+                if d[2] == 0x4E:
+                    break
+            except usb.USBError:
+                raise
 
     def init_device(self):
         self._connection.reset()
@@ -282,11 +297,11 @@ class FitBit(ANTlibusb):
         self.reset()
         self.send_network_key(0, [0,0,0,0,0,0,0,0])
         self.assign_channel()
-        self.set_channel_period(0)
-        self.set_channel_frequency(0)
-        self.set_transmit_power(0)
-        self.set_search_timeout(0)
-        self.set_channel_id()
+        self.set_channel_period([0x0, 0x10])
+        self.set_channel_frequency(0x2)
+        self.set_transmit_power(0x3)
+        self.set_search_timeout(0xFF)
+        self.set_channel_id([0xff, 0xff, 0x01, 0x01])
         self.open_channel()
 
         print ["%02x" % x for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)]
@@ -298,17 +313,7 @@ class FitBit(ANTlibusb):
         print self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
         print self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
 
-        # FitBit device initialization
-        while 1:
-            try:
-                for i in range(0, 20):
-                    self.check_receive_ready()
-                    time.sleep(1)                
-                d = self._receive(13)
-                if d[4] == 0x0:
-                    break
-            except usb.USBError:
-                pass
+        self.wait_for_sync_request()
         self.reset_fitbit()
 
     def run_opcode(self, opcode):
