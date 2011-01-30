@@ -97,31 +97,31 @@ class ANT(object):
             return "%02x" % event
 
     def reset(self):
-        return self._sendMessage(0x4a, [0x00])
+        return self._sendMessage(0x4a, 0x00)
 
     def setChannelFrequency(self, freq):
-        return self._sendMessage(0x45, [freq])
+        return self._sendMessage(0x45, freq)
 
     def setTransmitPower(self, power):
-        return self._sendMessage(0x47, [power])
+        return self._sendMessage(0x47, power)
 
     def setSearchTimeout(self, timeout):
-        return self._sendMessage(0x44, [timeout])
+        return self._sendMessage(0x44, timeout)
 
     def sendNetworkKey(self, network, key):
-        return self._sendMessage(0x46, [network, key])
+        return self._sendMessage(0x46, network, key)
 
     def setChannelPeriod(self, period):
-        return self._sendMessage(0x43, [period])
+        return self._sendMessage(0x43, period)
 
     def setChannelID(self):
-        return self._sendMessage(0x51, [0x00, 0x00, 0x00, 0x00, 0x00])
+        return self._sendMessage(0x51, 0x00, 0x00, 0x00, 0x00, 0x00)
 
     def openChannel(self):
-        return self._sendMessage(0x4b, [0x00])
+        return self._sendMessage(0x4b, 0x00)
 
     def assignChannel(self):
-        return self._sendMessage(0x42, [self._chan, 0x00, 0x00])
+        return self._sendMessage(0x42, self._chan, 0x00, 0x00)
 
     def sendAck(self, l):
         return self._sendMessage(0x4f, l)
@@ -178,7 +178,7 @@ class ANTlibusb(ANT):
     def _send(self, command):
         # libusb expects ordinals, it'll redo the conversion itself.
         self._connection.write(self.ep['out'], map(ord, command), 0, 100)
-        print ["%02x" % (x) for x in self._receive(12)]
+        self.dataReceived(''.join(map(chr, self._receive(12))))
 
     def _receive(self, size=64):
         return self._connection.read(self.ep['in'], size, 0, 1000)
