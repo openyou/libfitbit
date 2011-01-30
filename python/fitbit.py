@@ -97,31 +97,31 @@ class ANT(object):
             return "%02x" % event
 
     def reset(self):
-        return self._sendMessage(0x4a, 0x00)
+        return self._sendMessage(0x4a, [0x00])
 
     def setChannelFrequency(self, freq):
-        return self._sendMessage(0x45, freq)
+        return self._sendMessage(0x45, [freq])
 
     def setTransmitPower(self, power):
-        return self._sendMessage(0x47, power)
+        return self._sendMessage(0x47, [power])
 
     def setSearchTimeout(self, timeout):
-        return self._sendMessage(0x44, timeout)
+        return self._sendMessage(0x44, [timeout])
 
     def sendNetworkKey(self, network, key):
-        return self._sendMessage(0x46, network, key)
+        return self._sendMessage(0x46, [network, key])
 
     def setChannelPeriod(self, period):
-        return self._sendMessage(0x43, period)
+        return self._sendMessage(0x43, [period])
 
     def setChannelID(self):
-        return self._sendMessage(0x51, 0x00, 0x00, 0x00, 0x00, 0x00)
+        return self._sendMessage(0x51, [0x00, 0x00, 0x00, 0x00, 0x00])
 
     def openChannel(self):
-        return self._sendMessage(0x4b, 0x00)
+        return self._sendMessage(0x4b, [0x00])
 
     def assignChannel(self):
-        return self._sendMessage(0x42, self._chan, 0x00, 0x00)
+        return self._sendMessage(0x42, [self._chan, 0x00, 0x00])
 
     def sendAck(self, l):
         return self._sendMessage(0x4f, l)
@@ -176,6 +176,7 @@ class ANTlibusb(ANT):
             self._connection = None
 
     def _send(self, command):
+        # libusb expects ordinals, it'll redo the conversion itself.
         self._connection.write(self.ep['out'], map(ord, command), 0, 100)
         print ["%02x" % (x) for x in self._receive(12)]
 
@@ -194,13 +195,14 @@ class FitBit(ANTlibusb):
         # bmRequestType, bmRequest, wValue, wIndex, data
         self._connection.ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
-        # self._receive(0x1000)
+        # At this point, we get a 4096 buffer, then start all over
+        # again? Apparently doesn't require an explicit receive
         self._connection.ctrl_transfer(0x40, 0x00, 0x0, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x4A, 0x0, [])
-        print self._connection.ctrl_transfer(0xC0, 0xFF, 0x370B, 0x0, 1)
-        # self._connection.ctrl_transfer(0x40, 0xFF, 0x370B, 0x0, [0x2])
+        # Receive 1 byte, should be 0x2
+        self._connection.ctrl_transfer(0xC0, 0xFF, 0x370B, 0x0, 1)
         self._connection.ctrl_transfer(0x40, 0x03, 0x800, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x13, 0x0, 0x0, \
                                            [0x08, 0x00, 0x00, 0x00,
@@ -209,8 +211,12 @@ class FitBit(ANTlibusb):
                                             0x00, 0x00, 0x00, 0x00
                                             ])
         self._connection.ctrl_transfer(0x40, 0x12, 0x0C, 0x0, [])
-        
+
+        # We get an ant message after doing all of this, that I'm
+        # going to guess means we're connected and running. Not seeing
+        # it in the USB analyzer logs, but whatever.
         self._receive(12)
+
     def initDevice(self):
         self._connection.reset()
         self.controlInit()
