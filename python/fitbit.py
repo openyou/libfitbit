@@ -4,6 +4,7 @@
 # http://code.google.com/p/mstump-learning-exercises/source/browse/trunk/python/ANT/ant_twisted.py
 # Added to and untwistedized by Kyle Machulis <kyle@nonpolynomial.com>
 
+import time
 import base64
 import sys
 import operator
@@ -20,6 +21,9 @@ def hexRepr(data):
 def intListToByteList(data):
     return map(lambda i: struct.pack('!H', i)[1], array.array('B', data))
 
+class ANTStatusException(Exception):
+    pass
+
 class ANT(object):
 
     def __init__(self, chan=0x00, debug=False):
@@ -30,7 +34,7 @@ class ANT(object):
         self._transmitBuffer = []
         self._receiveBuffer = []
 
-    def dataReceived(self, data):
+    def data_received(self, data):
         if self._debug:
             print "<-- " + hexRepr(data)
 
@@ -52,7 +56,7 @@ class ANT(object):
                 if message[2] == 0x40:
                     printBuffer.append("MSG_RESPONSE_EVENT")
                     printBuffer.append("CHAN:%02x" % message[3])
-                    printBuffer.append(self._eventToString(message[4]))
+                    printBuffer.append(self._event_to_string(message[4]))
                     printBuffer.extend(hexList(intListToByteList(message[5:-1])))
                     printBuffer.append("CHKSUM:%02x" % message[-1])
                     # if message[4] == 1:
@@ -62,7 +66,7 @@ class ANT(object):
 
                 print "<-- " + repr(printBuffer)
 
-    def _eventToString(self, event):
+    def _event_to_string(self, event):
         try:
             return { 0:"RESPONSE_NO_ERROR",
                      1:"EVENT_RX_SEARCH_TIMEOUT",
@@ -96,43 +100,82 @@ class ANT(object):
         except:
             return "%02x" % event
 
+    def _check_reset_response(self):
+        data = self._receive(5)
+        if data[2] == 0x6f:
+            return
+        raise ANTStatusException("Reset expects message type 0x6f, got %02x" % (data[2]))
+
+    def _check_ok_response(self):
+        # response packets will always be 7 bytes
+        status = self._receive(7)        
+
+        if status[2] == 0x40 and status[5] == 0x0:
+            return
+        raise ANTStatusException("Message status %d does not match 0x0 (NO_ERROR)" % (status[5]))
+
+    def _check_acknowledged_response(self):
+        # response packets will always be 7 bytes
+        broadcast = self._receive(13)
+        self._check_ok_response()
+
     def reset(self):
-        return self._sendMessage(0x4a, 0x00)
+        self._send_message(0x4a, 0x00)
+        self._check_reset_response()
 
-    def setChannelFrequency(self, freq):
-        return self._sendMessage(0x45, freq)
+    def set_channel_frequency(self, freq):
+        self._send_message(0x45, freq)
+        self._check_ok_response()
 
-    def setTransmitPower(self, power):
-        return self._sendMessage(0x47, power)
+    def set_transmit_power(self, power):
+        self._send_message(0x47, power)
+        self._check_ok_response()
 
-    def setSearchTimeout(self, timeout):
-        return self._sendMessage(0x44, timeout)
+    def set_search_timeout(self, timeout):
+        self._send_message(0x44, timeout)
+        self._check_ok_response()
 
-    def sendNetworkKey(self, network, key):
-        return self._sendMessage(0x46, network, key)
+    def send_network_key(self, network, key):
+        self._send_message(0x46, network, key)
+        self._check_ok_response()
 
-    def setChannelPeriod(self, period):
-        return self._sendMessage(0x43, period)
+    def set_channel_period(self, period):
+        self._send_message(0x43, period)
+        self._check_ok_response()
 
-    def setChannelID(self):
-        return self._sendMessage(0x51, 0x00, 0x00, 0x00, 0x00, 0x00)
+    def set_channel_id(self):
+        self._send_message(0x51, self._chan, 0x00, 0x00, 0x00, 0x00)
+        self._check_ok_response()
 
-    def openChannel(self):
-        return self._sendMessage(0x4b, 0x00)
+    def open_channel(self):
+        self._send_message(0x4b, self._chan)
+        self._check_ok_response()
 
-    def assignChannel(self):
-        return self._sendMessage(0x42, self._chan, 0x00, 0x00)
+    def close_channel(self):
+        self._send_message(0x4c, self._chan)
+        self._check_ok_response()
 
-    def sendAck(self, l):
-        return self._sendMessage(0x4f, l)
+    def assign_channel(self):
+        self._send_message(0x42, self._chan, 0x00, 0x00)
+        self._check_ok_response()
 
-    def sendStr(self, instring):
+    def send_acknowledged_data(self, l):
+        self._send_message(0x4f, self._chan, l)
+        self._check_acknowledged_response()
+
+    def receive_acknowlegment(self):
+        pass
+
+    def receive_response(self):
+        pass
+
+    def send_str(self, instring):
         if len(instring) > 8:
             raise "string is too big"
 
-        return self._sendMessage(*[0x4e] + list(struct.unpack('%sB' % len(instring), instring)))
+        return self._send_message(*[0x4e] + list(struct.unpack('%sB' % len(instring), instring)))
 
-    def _sendMessage(self, *args):
+    def _send_message(self, *args):
         data = list()
         for l in list(args):
             if isinstance(l, list):
@@ -163,7 +206,7 @@ class ANTlibusb(ANT):
         super(ANTlibusb, self).__init__(chan, debug)
         self._connection = False
 
-    def openDevice(self, vid, pid):
+    def open(self, vid, pid):
         self._connection = usb.core.find(idVendor = vid,
                                          idProduct = pid)
         if self._connection is None:
@@ -171,26 +214,33 @@ class ANTlibusb(ANT):
         self._connection.set_configuration()
         return True
 
-    def closeDevice(self):
+    def close(self):
         if self._connection is not None:
             self._connection = None
 
     def _send(self, command):
         # libusb expects ordinals, it'll redo the conversion itself.
-        self._connection.write(self.ep['out'], map(ord, command), 0, 100)
-        self.dataReceived(''.join(map(chr, self._receive(12))))
+        c = command
+        # if ord(c[2]) == 0x4f:
+        #     c = c + ['\x00', '\x00']
+        # print c
+        self._connection.write(self.ep['out'], map(ord, c), 0, 100)
+
 
     def _receive(self, size=64):
-        return self._connection.read(self.ep['in'], size, 0, 1000)
+        r = self._connection.read(self.ep['in'], size, 0, 1000)
+        if self._debug:
+            self.data_received(''.join(map(chr, r)))
+        return r
 
 class FitBit(ANTlibusb):
     def __init__(self, debug = False):
         super(FitBit, self).__init__(debug=debug)
 
-    def openDevice(self):
-        return super(FitBit, self).openDevice(0x10c4, 0x84c4)
+    def open(self):
+        return super(FitBit, self).open(0x10c4, 0x84c4)
 
-    def controlInit(self):
+    def fitbit_control_init(self):
         # Device setup
         # bmRequestType, bmRequest, wValue, wIndex, data
         self._connection.ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
@@ -212,35 +262,64 @@ class FitBit(ANTlibusb):
                                             ])
         self._connection.ctrl_transfer(0x40, 0x12, 0x0C, 0x0, [])
 
-        # We get an ant message after doing all of this, that I'm
-        # going to guess means we're connected and running. Not seeing
-        # it in the USB analyzer logs, but whatever.
-        self._receive(12)
+        # We get an ant reset message after doing all of this, that
+        # I'm going to guess means we're connected and running. Not
+        # seeing it in the USB analyzer logs, but whatever.
+        self._check_reset_response()
 
-    def initDevice(self):
+    def reset_fitbit(self):
+        self.send_acknowledged_data([0x78, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+
+    def check_receive_ready(self):
+        print self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
+        print self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
+
+    def init_device(self):
         self._connection.reset()
-        self.controlInit()
+        self.fitbit_control_init()
+
         # ANT device initialization
-
         self.reset()
-        self.sendNetworkKey(0, [0,0,0,0,0,0,0,0])
-        self.assignChannel()
-        self.setChannelPeriod(0)
-        self.setChannelFrequency(0)
-        self.setTransmitPower(0)
-        self.setSearchTimeout(0)
-        self.setChannelID()
-        self.openChannel()
+        self.send_network_key(0, [0,0,0,0,0,0,0,0])
+        self.assign_channel()
+        self.set_channel_period(0)
+        self.set_channel_frequency(0)
+        self.set_transmit_power(0)
+        self.set_search_timeout(0)
+        self.set_channel_id()
+        self.open_channel()
 
-    def runOpCode(self, opcode):
+        print ["%02x" % x for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)]
+        print ["%02x" % x for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)]
+        print ["%02x" % x for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0200, 0x00, 0x20)]
+        print self._connection.ctrl_transfer(0x80, 0x06, 0x0300, 0x00, 0x01fe)
+        print self._connection.ctrl_transfer(0x80, 0x06, 0x0301, 0x0409, 0x01fe)
+        print self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
+        print self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
+        print self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
+
+        # FitBit device initialization
+        while 1:
+            try:
+                for i in range(0, 20):
+                    self.check_receive_ready()
+                    time.sleep(1)                
+                d = self._receive(13)
+                if d[4] == 0x0:
+                    break
+            except usb.USBError:
+                pass
+        self.reset_fitbit()
+
+    def run_opcode(self, opcode):
         pass
 
 def main():
     device = FitBit(True)
-    if not device.openDevice():
+    if not device.open():
         print "No devices connected!"
         return 1
-    device.initDevice()
+    device.init_device()
     return 0
 
 if __name__ == '__main__':
