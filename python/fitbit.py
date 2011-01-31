@@ -11,6 +11,7 @@ import operator
 import struct
 import array
 import usb
+import random
 
 def hexList(data):
     return map(lambda s: s.encode('HEX'), data)
@@ -33,6 +34,7 @@ class ANT(object):
         self._state = 0
         self._transmitBuffer = []
         self._receiveBuffer = []
+        self._old_output = []
 
     def data_received(self, data):
         if self._debug:
@@ -64,7 +66,7 @@ class ANT(object):
                 else:
                     printBuffer = hexRepr(intListToByteList(message))
 
-                print "<-- " + repr(printBuffer)
+                # print "<-- " + repr(printBuffer)
 
     def _event_to_string(self, event):
         try:
@@ -103,21 +105,18 @@ class ANT(object):
     def _check_reset_response(self):
         data = self._receive(5)
         if data[2] == 0x6f:
+            self._old_output = data
             return
         raise ANTStatusException("Reset expects message type 0x6f, got %02x" % (data[2]))
 
     def _check_ok_response(self):
         # response packets will always be 7 bytes
         status = self._receive(7)
-
+        
         if status[2] == 0x40 and status[5] == 0x0:
             return
+        
         raise ANTStatusException("Message status %d does not match 0x0 (NO_ERROR)" % (status[5]))
-
-    def _check_acknowledged_response(self):
-        # response packets will always be 7 bytes
-        broadcast = self._receive(13)
-        self._check_ok_response()
 
     def reset(self):
         self._send_message(0x4a, 0x00)
@@ -159,15 +158,29 @@ class ANT(object):
         self._send_message(0x42, self._chan, 0x00, 0x00)
         self._check_ok_response()
 
+    def _check_acknowledged_response(self):
+        # response packets will always be 7 bytes
+        while 1:
+            status = self._receive(4096, True)
+            if len(status) > 0 and status[2] == 0x40 and status[5] == 0x5:
+                if self._debug:
+                    self.data_received(''.join(map(chr, status)))
+                break
+            #time.sleep(1)
+
+    def _check_burst_response(self):
+        # response packets will always be 7 bytes
+        while 1:
+            status = self._receive(4096, True)
+            if len(status) > 0 and status[2] == 0x50:
+                if self._debug:
+                    self.data_received(''.join(map(chr, status)))
+                if status[3] == 0xc0 or status[3] == 0xe0 or status[3] == 0xa0:
+                    return 0
+
     def send_acknowledged_data(self, l):
-        self._send_message(0x4f, self._chan, l)
+        self._send_message(0x4f, self._chan, l)        
         self._check_acknowledged_response()
-
-    def receive_acknowlegment(self):
-        pass
-
-    def receive_response(self):
-        pass
 
     def send_str(self, instring):
         if len(instring) > 8:
@@ -191,7 +204,7 @@ class ANT(object):
             print "--> " + hexRepr(self._transmitBuffer)
         return self._send(self._transmitBuffer)
 
-    def _receive(self, size=64):
+    def _receive(self, size=64, quiet=False):
         raise Exception("Need to define _receive function for ANT child class!")
 
     def _send(self):
@@ -211,6 +224,7 @@ class ANTlibusb(ANT):
                                          idProduct = pid)
         if self._connection is None:
             return False
+
         self._connection.set_configuration()
         return True
 
@@ -226,12 +240,9 @@ class ANTlibusb(ANT):
         # print c
         self._connection.write(self.ep['out'], map(ord, c), 0, 100)
 
-
-    def _receive(self, size=64):
-        print "Trying to receive"
+    def _receive(self, size=64, quiet=False):
         r = self._connection.read(self.ep['in'], size, 0, 1000)
-        print r
-        if self._debug:
+        if self._debug and not quiet:
             self.data_received(''.join(map(chr, r)))
         return r
 
@@ -270,29 +281,27 @@ class FitBit(ANTlibusb):
         self._check_reset_response()
 
     def reset_fitbit(self):
+        # 0x78 0x01 is apparently the device reset command
         self.send_acknowledged_data([0x78, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-    def check_receive_ready(self):
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
+        # 0x78 0x02 is device id reset. This tells the device the new
+        cid = [random.randint(0,254), random.randint(0,254)]
+        self.send_acknowledged_data([0x78, 0x02] + cid + [0x00, 0x00, 0x00, 0x00])
+        self.close_channel()
+        self.init_device_channel(cid + [0x01, 0x01])
+        self.wait_for_beacon()
 
-    def wait_for_sync_request(self):
+    def wait_for_beacon(self):
         # FitBit device initialization
         while 1:
             try:
-                for i in range(0, 30):
-                    self.check_receive_ready()
-                    time.sleep(1)
                 d = self._receive(13)
                 if d[2] == 0x4E:
                     break
             except usb.USBError:
-                raise
+                pass
 
-    def init_device(self):
-        self._connection.reset()
-        self.fitbit_control_init()
-
+    def init_device_channel(self, channel): 
         # ANT device initialization
         self.reset()
         self.send_network_key(0, [0,0,0,0,0,0,0,0])
@@ -301,20 +310,70 @@ class FitBit(ANTlibusb):
         self.set_channel_frequency(0x2)
         self.set_transmit_power(0x3)
         self.set_search_timeout(0xFF)
-        self.set_channel_id([0xff, 0xff, 0x01, 0x01])
+        self.set_channel_id(channel)
         self.open_channel()
 
-        print ["%02x" % x for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)]
-        print ["%02x" % x for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)]
-        print ["%02x" % x for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0200, 0x00, 0x20)]
-        print self._connection.ctrl_transfer(0x80, 0x06, 0x0300, 0x00, 0x01fe)
-        print self._connection.ctrl_transfer(0x80, 0x06, 0x0301, 0x0409, 0x01fe)
-        print self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
-        print self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
-        print self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
+    def init_fitbit(self):
+        self.fitbit_control_init()
+        self.init_device_channel([0xff, 0xff, 0x01, 0x01])
+        # Run a whole bunch of descriptor stuff. Not sure why, just
+        # replaying what I see.
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0200, 0x00, 0x20)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0300, 0x00, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0301, 0x0409, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
 
-        self.wait_for_sync_request()
+    def transfer(self):
+        self.send_acknowledged_data([0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x39, 0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3A, 0x70, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00])
+        # Static. Should equal:
+        # ['a4', '09', '50', '00', '3a', '81', '0c', '00', '00', '00', '00', 'ea', 'a0']
+        # ['a4', '09', '50', '20', '58', 'f7', '7a', '65', '51', '0a', '02', '17', '23']
+        # ['a4', '09', '50', 'c0', '02', '17', '00', '01', '1e', '5f', '00', '00', '68']
+        self._check_burst_response()
+        self.send_acknowledged_data([0x3B, 0x60, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3C, 0x22, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3D, 0x60, 0x00, 0x02, 0x02, 0x00, 0x00, 0x00])
+        # Changes - does not match usb log!
+        # ['a4', '09', '50', '00', '3d', '81', '0e', '00', '00', '00', '00', 'XX', 'XX']
+        # ['a4', '09', '50', '20', 'XX', '00', 'XX', '00', 'XX', '00', 'XX', '00', 'XX']
+        # ['a4', '09', '50', 'c0', '1e', '1e', 'XX', '10', '1e', '5f', '00', '00', 'XX']        
+        self._check_burst_response()
+        self.send_acknowledged_data([0x3E, 0x60, 0x00, 0x02, 0x03, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3F, 0x22, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x38, 0x60, 0x00, 0x02, 0x04, 0x00, 0x00, 0x00])
+        self._check_burst_response()
+        self.send_acknowledged_data([0x39, 0x60, 0x00, 0x02, 0x05, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3A, 0x22, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3B, 0x60, 0x00, 0x02, 0x06, 0x00, 0x00, 0x00])
+        self._check_burst_response()
+        self.send_acknowledged_data([0x3C, 0x60, 0x00, 0x02, 0x07, 0x00, 0x00, 0x00])
+        self._check_burst_response()
+        self.send_acknowledged_data([0x3D, 0x60, 0x00, 0x02, 0x08, 0x00, 0x00, 0x00])
+        self._check_burst_response()
+        self.send_acknowledged_data([0x3E, 0x60, 0x00, 0x02, 0x09, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3F, 0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x38, 0x70, 0x00, 0x02, 0x0A, 0x00, 0x00, 0x00])
+        self._check_burst_response()
+        self.send_acknowledged_data([0x39, 0x60, 0x00, 0x02, 0x0B, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3A, 0x22, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.send_acknowledged_data([0x3B, 0x70, 0x00, 0x02, 0x0C, 0x00, 0x00, 0x00])
+        self._check_burst_response()
+        # self.send_acknowledged_data([0x3C, 0x60, 0x00, 0x02, 0x0D, 0x00, 0x00, 0x00])
+        # self.send_acknowledged_data([0x3D, 0x26, 0xC3, 0x3B, 0x46, 0x4D, 0x00, 0x00])
+        # self.send_acknowledged_data([0x3A, 0x23, 0x00, 0x0E, 0x00, 0x00, 0x00, 0x00])
+
+    def run_transfer(self):
+        self._connection.reset()
+        self.init_fitbit()
+        self.wait_for_beacon()
         self.reset_fitbit()
+        self.transfer()
 
     def run_opcode(self, opcode):
         pass
@@ -324,7 +383,11 @@ def main():
     if not device.open():
         print "No devices connected!"
         return 1
-    device.init_device()
+    try:
+        device.run_transfer()
+    finally:
+        print "Closing!"
+        device.close()
     return 0
 
 if __name__ == '__main__':
