@@ -64,19 +64,7 @@
 # - Implementing data clearing
 # - Fix ANT Burst packet identifer
 # - Add checksum checks for ANT receive
-#
-# WTFs
-#
-# - When sending opcode packets, the usb logs say there're responses,
-# but they don't seem to work right. i.e. we should get more an
-# acknowledge response from the 0x24 opcode command (should get back a
-# packet with 0x42 as data), but it just stalls on read after we
-# receive the confirmation.
-# - Same as above happens with data bank transfers too. Currently
-# there's a 'no_burst' argument to skip often null banks. This is a
-# hack until I have better understanding of the protocol.
-
-
+# - Fix packet status identifiers in ANT
 
 import itertools
 import time
@@ -236,10 +224,10 @@ class ANT(object):
     def receive_acknowledged_reply(self, size = 13):        
         while 1:
             status = self._receive(4096, True)
-            if len(status) > 0 and status[2] == 0x4F and status[5] == 0x5:
+            if len(status) > 0 and status[2] == 0x4F:
                 if self._debug:
                     self.data_received(''.join(map(chr, status)))
-                return status[4:-1]
+                return status[4:-1].tolist()
 
     def _check_acknowledged_response(self):
         # response packets will always be 7 bytes
@@ -255,11 +243,12 @@ class ANT(object):
         response = []
         while 1:
             status = self._receive(4096, True)
-            if len(status) > 0 and status[2] == 0x50:
+
+            if len(status) > 0 and status[2] == 0x50 or status[2] == 0x4f:
                 if self._debug:
                     self.data_received(''.join(map(chr, status)))
                 response = response + status[4:-1].tolist()
-                if status[3] == 0xc0 or status[3] == 0xe0 or status[3] == 0xa0:
+                if status[3] == 0xc0 or status[3] == 0xe0 or status[3] == 0xa0 or status[2] == 0x4f:
                     return response
 
     def send_acknowledged_data(self, l):
@@ -301,6 +290,7 @@ class ANTlibusb(ANT):
     def __init__(self, chan=0x0, debug=False):
         super(ANTlibusb, self).__init__(chan, debug)
         self._connection = False
+        self.timeout = 1000
 
     def open(self, vid, pid):
         self._connection = usb.core.find(idVendor = vid,
@@ -321,8 +311,8 @@ class ANTlibusb(ANT):
         self._connection.write(self.ep['out'], map(ord, c), 0, 100)
 
     def _receive(self, size=64, quiet=False):
-        r = self._connection.read(self.ep['in'], size, 0, 1000)
-        if self._debug and not quiet:
+        r = self._connection.read(self.ep['in'], size, 0, self.timeout)
+        if self._debug: # and not quiet:
             self.data_received(''.join(map(chr, r)))
         return r
 
@@ -482,8 +472,8 @@ class FitBit(ANTlibusb):
 
     def send_tracker_packet(self, packet, expected_response = None):
         self.send_acknowledged_data([self.tracker.get_packet_id()] + packet)
-        # if expected_response is not None:
-        #     self.check_tracker_response(expected_response)
+        if expected_response is not None:
+            self.check_tracker_response(expected_response)
 
     def check_tracker_response(self, response):
         data = self.receive_acknowledged_reply()
@@ -495,12 +485,11 @@ class FitBit(ANTlibusb):
     def ping_tracker(self):
         self.send_acknowledged_data([0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-    def check_tracker_data_bank(self, index, no_burst = False):
+    def check_tracker_data_bank(self, index):
         self.send_tracker_packet([0x60, 0x00, 0x02, index, 0x00, 0x00, 0x00])
         # HACK. Dunno why, some banks don't send back that they don't
         # have anything to send. This doesn't match the usb logs.
-        if not no_burst:
-            return self._get_tracker_burst()
+        return self._get_tracker_burst()
         
     def transfer(self):
         # Goal of the transfer function: None of these should be
@@ -523,7 +512,7 @@ class FitBit(ANTlibusb):
         self.get_tracker_info()
 
         # There is never anything in bank 1. I don't even know why we check it.
-        self.check_tracker_data_bank(0x1, True)
+        self.check_tracker_data_bank(0x1)
 
         # URL REQUEST HERE
         # This is where we get the rest of the opcodes to query
@@ -532,7 +521,7 @@ class FitBit(ANTlibusb):
 
         # There is probably data coming back from this I need.
         data = self.send_tracker_control_packet(0x2)
-        self.check_tracker_data_bank(0x3, True)
+        self.check_tracker_data_bank(0x3)
 
         # Changes - does not match usb log!
         # ['a4', '09', '50', '00', '3d', '81', '0e', '00', '00', '00', '00', 'XX', 'XX']
@@ -541,18 +530,18 @@ class FitBit(ANTlibusb):
 
         self.send_tracker_packet([0x22, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00])
         self.check_tracker_data_bank(0x04)
-        self.check_tracker_data_bank(0x05, True)
+        self.check_tracker_data_bank(0x05)
         self.send_tracker_packet([0x22, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
         self.check_tracker_data_bank(0x06)
         self.check_tracker_data_bank(0x07)
         self.check_tracker_data_bank(0x08)
-        self.check_tracker_data_bank(0x09, True)
+        self.check_tracker_data_bank(0x09)
         self.send_tracker_packet([0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         data = self.send_tracker_control_packet(0x0A)
-        self.check_tracker_data_bank(0x0B, True)
+        self.check_tracker_data_bank(0x0B)
         self.send_tracker_packet([0x22, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
         data = self.send_tracker_control_packet(0x0C)
-        self.check_tracker_data_bank(0x0D, True)
+        self.check_tracker_data_bank(0x0D)
 
         # URL REQUEST HERE
         # This is where we ship everything back to the mothership
