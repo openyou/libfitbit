@@ -67,7 +67,6 @@
 # - Fix packet status identifiers in ANT
 
 import itertools
-import time
 import base64
 import sys
 import operator
@@ -100,6 +99,7 @@ class ANT(object):
         self._old_output = []
 
     def data_received(self, data):
+        return
         if self._debug:
             print "<-- " + hexRepr(data)
 
@@ -225,8 +225,6 @@ class ANT(object):
         while 1:
             status = self._receive(4096, True)
             if len(status) > 0 and status[2] == 0x4F:
-                if self._debug:
-                    self.data_received(''.join(map(chr, status)))
                 return status[4:-1].tolist()
 
     def _check_acknowledged_response(self):
@@ -234,10 +232,7 @@ class ANT(object):
         while 1:
             status = self._receive(4096, True)
             if len(status) > 0 and status[2] == 0x40 and status[5] == 0x5:
-                if self._debug:
-                    self.data_received(''.join(map(chr, status)))
                 break
-            #time.sleep(1)
 
     def _check_burst_response(self):
         response = []
@@ -245,8 +240,6 @@ class ANT(object):
             status = self._receive(4096, True)
 
             if len(status) > 0 and status[2] == 0x50 or status[2] == 0x4f:
-                if self._debug:
-                    self.data_received(''.join(map(chr, status)))
                 response = response + status[4:-1].tolist()
                 if status[3] == 0xc0 or status[3] == 0xe0 or status[3] == 0xa0 or status[2] == 0x4f:
                     return response
@@ -485,6 +478,11 @@ class FitBit(ANTlibusb):
     def ping_tracker(self):
         self.send_acknowledged_data([0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
+    def check_second_update_bank(self, index):
+        data = self.check_tracker_data_bank(index)
+        for i in range(0, len(data), 13):
+            print ["%02x" %(x) for x in data[i:i+13]]
+
     def check_tracker_data_bank(self, index):
         self.send_tracker_packet([0x60, 0x00, 0x02, index, 0x00, 0x00, 0x00])
         # HACK. Dunno why, some banks don't send back that they don't
@@ -511,6 +509,55 @@ class FitBit(ANTlibusb):
         # one, be it to a databank or a configuration query.
         self.get_tracker_info()
 
+
+        # The rules after we pick up the tracker info get a little
+        # freaky. This ignores the beginning increasing index byte,
+        # we're just talking about commands here.
+        #
+        # First off, we send an opcode, from the array listed below
+
+        opcode_array = [[0x22, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00],
+                        [0x22, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00],
+                        [0x22, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00],
+                        [0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+                        [0x22, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]]
+                   
+        # Opcode should return us a status like
+        #
+        # 0x42
+        #
+        # After which, we send what I guess is the "databank opener"
+        # command.
+        #
+        # 0x70 0x00 0x02 0x0X
+        #
+        # The X is a databank index, starting from 0 (which it
+        # actually does back in our get_tracker_info function, but we
+        # have that hardcoded since we actually know what that data
+        # is.) X increases by 1 with every command
+        #
+        # This should get us back at least some data. We then continue
+        # emptying the databank using the "databank continue" commands
+        #
+        # 0x60 0x00 0x02 0x0X
+        # 
+        # Once we hit a bank with no data, we send the next
+        # opcode. Repeat until we're out of opcodes.
+        #
+        # So, the whole loop looks like:
+        #
+        # --> 0x22 0x05
+        # <-- 0x01 0x05
+        # <-- 0x42
+        # --> 0x70 0x00 0x02 0x02
+        # <-- 0x01 0x05
+        # <-- 0x81 [length] [lots of packets]
+        # --> 0x60 0x00 0x02 0x03
+        # <-- 0x01 0x05
+        # <-- 0x81 0x0
+        # --> 0x22 0x04
+        # etc...
+        
         # There is never anything in bank 1. I don't even know why we check it.
         self.check_tracker_data_bank(0x1)
 
@@ -521,7 +568,9 @@ class FitBit(ANTlibusb):
 
         # There is probably data coming back from this I need.
         data = self.send_tracker_control_packet(0x2)
-        self.check_tracker_data_bank(0x3)
+        print ["%02x" % x for x in data] 
+        # We always get back 15 bytes of data from here. I have no idea what it means.
+        print ["%02x" % x for x in self.check_tracker_data_bank(0x03)] 
 
         # Changes - does not match usb log!
         # ['a4', '09', '50', '00', '3d', '81', '0e', '00', '00', '00', '00', 'XX', 'XX']
@@ -529,19 +578,22 @@ class FitBit(ANTlibusb):
         # ['a4', '09', '50', 'c0', '1e', '1e', 'XX', '10', '1e', '5f', '00', '00', 'XX']
 
         self.send_tracker_packet([0x22, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00])
-        self.check_tracker_data_bank(0x04)
-        self.check_tracker_data_bank(0x05)
+        print ["%02x" % x for x in self.check_tracker_data_bank(0x04)] 
+        print ["%02x" % x for x in self.check_tracker_data_bank(0x05)]
         self.send_tracker_packet([0x22, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
-        self.check_tracker_data_bank(0x06)
-        self.check_tracker_data_bank(0x07)
-        self.check_tracker_data_bank(0x08)
-        self.check_tracker_data_bank(0x09)
+        self.check_second_update_bank(0x06)
+        self.check_second_update_bank(0x07)
+        self.check_second_update_bank(0x08)
+        self.check_second_update_bank(0x09)
         self.send_tracker_packet([0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         data = self.send_tracker_control_packet(0x0A)
-        self.check_tracker_data_bank(0x0B)
+        print ["%02x" % x for x in data]
+        print ["%02x" % x for x in self.check_tracker_data_bank(0x0B)]
+        print ["%02x" % x for x in self.check_tracker_data_bank(0x0C)]
         self.send_tracker_packet([0x22, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
         data = self.send_tracker_control_packet(0x0C)
-        self.check_tracker_data_bank(0x0D)
+        print ["%02x" % x for x in data]
+        print ["%02x" % x for x in self.check_tracker_data_bank(0x0D)]
 
         # URL REQUEST HERE
         # This is where we ship everything back to the mothership
