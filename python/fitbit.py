@@ -531,6 +531,9 @@ class FitBit(ANTlibusb):
         #
         # 0x70 0x00 0x02 0x0X
         #
+        # (THIS MAY NOT BE RIGHT. I'm seeing opcodes followed by 0x60
+        # commands in the log.)
+        #
         # The X is a databank index, starting from 0 (which it
         # actually does back in our get_tracker_info function, but we
         # have that hardcoded since we actually know what that data
@@ -546,17 +549,29 @@ class FitBit(ANTlibusb):
         #
         # So, the whole loop looks like:
         #
-        # --> 0x22 0x05
-        # <-- 0x01 0x05
-        # <-- 0x42
-        # --> 0x70 0x00 0x02 0x02
+        # --> 0x22 0x05 - Opcode
+        # <-- 0x01 0x05 - Success
+        # <-- 0x42 - Opcode Success? 
+        # --> 0x70 0x00 0x02 0x02 - 0x70 command? MAY NOT BE RIGHT
         # <-- 0x01 0x05
         # <-- 0x81 [length] [lots of packets]
-        # --> 0x60 0x00 0x02 0x03
+        # --> 0x60 0x00 0x02 0x03 - 0x60 continuation command? 
         # <-- 0x01 0x05
-        # <-- 0x81 0x0
+        # <-- 0x81 0x0 - We're out of data, start the next opcode.
         # --> 0x22 0x04
         # etc...
+
+        # ****************** WARNING **************************
+        #
+        # The following code is completely wrong.
+        #
+        # I haven't had a chance to update it since I figured out the
+        # opcode data access protocol, it's just built off a replay I
+        # was doing by hand. I'll hopefully get a chance to fix it
+        # tomorrow.
+        #
+        # But for now, yeah, this is not right. It doesn't take into
+        # account the variable size of the databanks.
         
         # There is never anything in bank 1. I don't even know why we check it.
         self.check_tracker_data_bank(0x1)
