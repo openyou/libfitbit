@@ -96,10 +96,8 @@ class ANT(object):
         self._state = 0
         self._transmitBuffer = []
         self._receiveBuffer = []
-        self._old_output = []
 
     def data_received(self, data):
-        return
         if self._debug:
             print "<-- " + hexRepr(data)
 
@@ -166,15 +164,15 @@ class ANT(object):
             return "%02x" % event
 
     def _check_reset_response(self):
-        data = self._receive(5)
+        data = self._receive()
+        print ["%02x" % (x) for x in data]
         if data[2] == 0x6f:
-            self._old_output = data
             return
         raise ANTStatusException("Reset expects message type 0x6f, got %02x" % (data[2]))
 
     def _check_ok_response(self):
         # response packets will always be 7 bytes
-        status = self._receive(7)
+        status = self._receive()
 
         if status[2] == 0x40 and status[5] == 0x0:
             return
@@ -223,21 +221,21 @@ class ANT(object):
 
     def receive_acknowledged_reply(self, size = 13):        
         while 1:
-            status = self._receive(4096, True)
+            status = self._receive()
             if len(status) > 0 and status[2] == 0x4F:
                 return status[4:-1].tolist()
 
     def _check_acknowledged_response(self):
         # response packets will always be 7 bytes
         while 1:
-            status = self._receive(4096, True)
+            status = self._receive()
             if len(status) > 0 and status[2] == 0x40 and status[5] == 0x5:
                 break
 
     def _check_burst_response(self):
         response = []
         while 1:
-            status = self._receive(4096, True)
+            status = self._receive(15)
 
             if len(status) > 0 and status[2] == 0x50 or status[2] == 0x4f:
                 response = response + status[4:-1].tolist()
@@ -269,7 +267,7 @@ class ANT(object):
             print "--> " + hexRepr(self._transmitBuffer)
         return self._send(self._transmitBuffer)
 
-    def _receive(self, size=64, quiet=False):
+    def _receive(self, size=4096):
         raise Exception("Need to define _receive function for ANT child class!")
 
     def _send(self):
@@ -303,9 +301,9 @@ class ANTlibusb(ANT):
         c = command
         self._connection.write(self.ep['out'], map(ord, c), 0, 100)
 
-    def _receive(self, size=64, quiet=False):
+    def _receive(self, size=4096):
         r = self._connection.read(self.ep['in'], size, 0, self.timeout)
-        if self._debug: # and not quiet:
+        if self._debug:
             self.data_received(''.join(map(chr, r)))
         return r
 
@@ -316,12 +314,13 @@ class FitBit(ANTlibusb):
         def __init__(self):
             # Cycle of 0-8, for creating tracker packet serial numbers
             self.tracker_packet_count = itertools.cycle(range(0,8))
-            
+
             # The tracker expects to start on 1, i.e. 0x39 This is set
             # after a reset (which is why we create the tracker in the
             # reset function). It won't talk if you try anything else.
             self.tracker_packet_count.next()
-            
+
+            self.current_bank_id = 1
             self.current_packet_id = None
             self.serial = None
             self.firmware_version = None
@@ -374,13 +373,13 @@ class FitBit(ANTlibusb):
         # bmRequestType, bmRequest, wValue, wIndex, data
         self._connection.ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
-        # At this point, we get a 4096 buffer, then start all over
-        # again? Apparently doesn't require an explicit receive
+        # # At this point, we get a 4096 buffer, then start all over
+        # # again? Apparently doesn't require an explicit receive
         self._connection.ctrl_transfer(0x40, 0x00, 0x0, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x4A, 0x0, [])
-        # Receive 1 byte, should be 0x2
+        # # Receive 1 byte, should be 0x2
         self._connection.ctrl_transfer(0xC0, 0xFF, 0x370B, 0x0, 1)
         self._connection.ctrl_transfer(0x40, 0x03, 0x800, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x13, 0x0, 0x0, \
@@ -390,11 +389,16 @@ class FitBit(ANTlibusb):
                                             0x00, 0x00, 0x00, 0x00
                                             ])
         self._connection.ctrl_transfer(0x40, 0x12, 0x0C, 0x0, [])
+        try:
+            self._receive()
+        except usb.USBError:
+            pass
+
 
         # We get an ant reset message after doing all of this, that
         # I'm going to guess means we're connected and running. Not
         # seeing it in the USB analyzer logs, but whatever.
-        self._check_reset_response()
+        # self._check_reset_response()
 
     def reset_tracker(self):
         # 0x78 0x01 is apparently the device reset command
@@ -413,7 +417,7 @@ class FitBit(ANTlibusb):
         # FitBit device initialization
         while 1:
             try:
-                d = self._receive(13)
+                d = self._receive()
                 if d[2] == 0x4E:
                     break
             except usb.USBError:
@@ -433,7 +437,7 @@ class FitBit(ANTlibusb):
 
     def init_fitbit(self):
         self.fitbit_control_init()
-        self.init_device_channel([0xff, 0xff, 0x01, 0x01])
+
         # Run a whole bunch of descriptor stuff. Not sure why, just
         # replaying what I see.
         self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
@@ -445,11 +449,13 @@ class FitBit(ANTlibusb):
         self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
         self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
 
+        self.init_device_channel([0xff, 0xff, 0x01, 0x01])
+        
     def _get_tracker_burst(self):
         d = self._check_burst_response()
         if d[1] != 0x81:
             raise Exception("Response received is not tracker burst! Got %s" % (d[0:2]))
-        size = d[2]
+        size = d[3] << 8 | d[2]
         if size == 0:
             return []
         return d[8:8+size]
@@ -478,16 +484,21 @@ class FitBit(ANTlibusb):
     def ping_tracker(self):
         self.send_acknowledged_data([0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-    def check_second_update_bank(self, index):
-        data = self.check_tracker_data_bank(index)
-        for i in range(0, len(data), 13):
-            print ["%02x" %(x) for x in data[i:i+13]]
-
     def check_tracker_data_bank(self, index):
         self.send_tracker_packet([0x60, 0x00, 0x02, index, 0x00, 0x00, 0x00])
-        # HACK. Dunno why, some banks don't send back that they don't
-        # have anything to send. This doesn't match the usb logs.
         return self._get_tracker_burst()
+
+    def get_data_bank(self, index, stride):        
+        self.send_tracker_packet([0x22, index, 0x00, 0x00, 0x00, 0x00, 0x00])
+        data = []
+        while 1:
+            bank = self.check_tracker_data_bank(self.tracker.current_bank_id)
+            self.tracker.current_bank_id += 1
+            if len(bank) == 0:
+                for i in range(0, len(data), stride):
+                    print ["%02x" %(x) for x in data[i:i+stride]]
+                return data
+            data = data + bank                
         
     def transfer(self):
         # Goal of the transfer function: None of these should be
@@ -509,18 +520,13 @@ class FitBit(ANTlibusb):
         # one, be it to a databank or a configuration query.
         self.get_tracker_info()
 
-
         # The rules after we pick up the tracker info get a little
         # freaky. This ignores the beginning increasing index byte,
         # we're just talking about commands here.
         #
         # First off, we send an opcode, from the array listed below
 
-        opcode_array = [[0x22, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00],
-                        [0x22, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00],
-                        [0x22, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00],
-                        [0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-                        [0x22, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]]
+        opcode_array = [0x05, 0x04, 0x02, 0x00, 0x01]
                    
         # Opcode should return us a status like
         #
@@ -561,54 +567,14 @@ class FitBit(ANTlibusb):
         # --> 0x22 0x04
         # etc...
 
-        # ****************** WARNING **************************
-        #
-        # The following code is completely wrong.
-        #
-        # I haven't had a chance to update it since I figured out the
-        # opcode data access protocol, it's just built off a replay I
-        # was doing by hand. I'll hopefully get a chance to fix it
-        # tomorrow.
-        #
-        # But for now, yeah, this is not right. It doesn't take into
-        # account the variable size of the databanks.
-        
-        # There is never anything in bank 1. I don't even know why we check it.
-        self.check_tracker_data_bank(0x1)
+        self.get_data_bank(0x05, 1000)
+        self.get_data_bank(0x04, 1000)
+        self.get_data_bank(0x02, 13)
+        self.get_data_bank(0x00, 7)
+        self.get_data_bank(0x01, 14)
 
-        # URL REQUEST HERE
-        # This is where we get the rest of the opcodes to query
-        
-        self.send_tracker_packet([0x22, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00])
-
-        # There is probably data coming back from this I need.
-        data = self.send_tracker_control_packet(0x2)
-        print ["%02x" % x for x in data] 
-        # We always get back 15 bytes of data from here. I have no idea what it means.
-        print ["%02x" % x for x in self.check_tracker_data_bank(0x03)] 
-
-        # Changes - does not match usb log!
-        # ['a4', '09', '50', '00', '3d', '81', '0e', '00', '00', '00', '00', 'XX', 'XX']
-        # ['a4', '09', '50', '20', 'XX', '00', 'XX', '00', 'XX', '00', 'XX', '00', 'XX']
-        # ['a4', '09', '50', 'c0', '1e', '1e', 'XX', '10', '1e', '5f', '00', '00', 'XX']
-
-        self.send_tracker_packet([0x22, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00])
-        print ["%02x" % x for x in self.check_tracker_data_bank(0x04)] 
-        print ["%02x" % x for x in self.check_tracker_data_bank(0x05)]
-        self.send_tracker_packet([0x22, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00])
-        self.check_second_update_bank(0x06)
-        self.check_second_update_bank(0x07)
-        self.check_second_update_bank(0x08)
-        self.check_second_update_bank(0x09)
-        self.send_tracker_packet([0x22, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-        data = self.send_tracker_control_packet(0x0A)
-        print ["%02x" % x for x in data]
-        print ["%02x" % x for x in self.check_tracker_data_bank(0x0B)]
-        print ["%02x" % x for x in self.check_tracker_data_bank(0x0C)]
-        self.send_tracker_packet([0x22, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00])
-        data = self.send_tracker_control_packet(0x0C)
-        print ["%02x" % x for x in data]
-        print ["%02x" % x for x in self.check_tracker_data_bank(0x0D)]
+        # for opcode in opcode_array:
+        #     self.get_data_bank(opcode)
 
         # URL REQUEST HERE
         # This is where we ship everything back to the mothership
