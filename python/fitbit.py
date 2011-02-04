@@ -87,6 +87,9 @@ def intListToByteList(data):
 class ANTStatusException(Exception):
     pass
 
+class ANTReceiveException(Exception):
+    pass
+
 class ANT(object):
 
     def __init__(self, chan=0x00, debug=False):
@@ -113,7 +116,6 @@ class ANT(object):
 
                 if reduce(operator.xor, message[:-1]) != message[-1]:
                     print "RCV CORRUPT MSG: %s" % hexRepr(intListToByteList(message))
-                    return
 
                 printBuffer = []
                 if message[2] == 0x40:
@@ -234,12 +236,17 @@ class ANT(object):
 
     def _check_burst_response(self):
         response = []
+        failure = False
         while 1:
-            status = self._receive(15)
-
+            try:
+                status = self._receive(15)
+            except ANTReceiveException:
+                failure = True
             if len(status) > 0 and status[2] == 0x50 or status[2] == 0x4f:
                 response = response + status[4:-1].tolist()
                 if status[3] == 0xc0 or status[3] == 0xe0 or status[3] == 0xa0 or status[2] == 0x4f:
+                    if failure:
+                        raise ANTReceiveException("Burst receive failed!")
                     return response
 
     def send_acknowledged_data(self, l):
@@ -303,6 +310,9 @@ class ANTlibusb(ANT):
 
     def _receive(self, size=4096):
         r = self._connection.read(self.ep['in'], size, 0, self.timeout)
+        checksum = reduce(operator.xor, r[:-1])
+        if len(r) == 0 or checksum != r[-1]:
+            raise ANTReceiveException("Checksums for packet do not match received values!")
         if self._debug:
             self.data_received(''.join(map(chr, r)))
         return r
@@ -492,7 +502,10 @@ class FitBit(ANTlibusb):
         self.send_tracker_packet([0x22, index, 0x00, 0x00, 0x00, 0x00, 0x00])
         data = []
         while 1:
-            bank = self.check_tracker_data_bank(self.tracker.current_bank_id)
+            try:
+                bank = self.check_tracker_data_bank(self.tracker.current_bank_id)
+            except ANTReceiveException:
+                continue
             self.tracker.current_bank_id += 1
             if len(bank) == 0:
                 for i in range(0, len(data), stride):
