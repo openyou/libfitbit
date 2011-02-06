@@ -495,8 +495,11 @@ class FitBit(ANTlibusb):
             # Send payload data to device
             if payload is not None:
                 self.send_tracker_payload(payload)
+            data = self.receive_acknowledged_reply()
+            if data[1] == 0x41:
+                return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
         if data[1] == 0x41:
-            return None
+            return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
     def send_tracker_payload(self, payload):
         p = [0x00, self.tracker.gen_packet_id(), 0x61, len(payload), 0x00, 0x00, 0x00, 0x00, 0x00]
@@ -510,7 +513,6 @@ class FitBit(ANTlibusb):
                 plist += [current_prefix | self._chan]
             plist += payload[i:i+8]
             p += plist
-        print ["%02x" % (x) for x in p]
         self._send_burst_data(p)
     
     def get_tracker_info(self):

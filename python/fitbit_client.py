@@ -124,7 +124,6 @@ class FitBitClient(object):
         self.fitbit.close()
 
 def main():
-    global xml_block
     f = FitBitClient()
     f.run_upload_request()
     return 0
