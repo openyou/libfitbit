@@ -234,6 +234,10 @@ class ANT(object):
             if len(status) > 0 and status[2] == 0x40 and status[5] == 0x5:
                 break
 
+    def _send_burst_data(self, data):
+        for l in range(0, len(data), 9):            
+            self._send_message(0x50, data[l:l+9])
+            
     def _check_burst_response(self):
         response = []
         failure = False
@@ -244,7 +248,7 @@ class ANT(object):
                 failure = True
             if len(status) > 0 and status[2] == 0x50 or status[2] == 0x4f:
                 response = response + status[4:-1].tolist()
-                if status[3] == 0xc0 or status[3] == 0xe0 or status[3] == 0xa0 or status[2] == 0x4f:
+                if (status[3] >> 4) > 0x8 or status[2] == 0x4f:
                     if failure:
                         raise ANTReceiveException("Burst receive failed!")
                     return response
@@ -272,7 +276,7 @@ class ANT(object):
 
         if self._debug:
             print "--> " + hexRepr(self._transmitBuffer)
-        return self._send(self._transmitBuffer)
+        # return self._send(self._transmitBuffer)
 
     def _receive(self, size=4096):
         raise Exception("Need to define _receive function for ANT child class!")
@@ -324,13 +328,13 @@ class FitBit(ANTlibusb):
         def __init__(self):
             # Cycle of 0-8, for creating tracker packet serial numbers
             self.tracker_packet_count = itertools.cycle(range(0,8))
-
+            self.tracker_packet_count.next()
             # The tracker expects to start on 1, i.e. 0x39 This is set
             # after a reset (which is why we create the tracker in the
             # reset function). It won't talk if you try anything else.
-            self.tracker_packet_count.next()
+            # self.tracker_packet_count.next()
 
-            self.current_bank_id = 1
+            self.current_bank_id = 0
             self.current_packet_id = None
             self.serial = None
             self.firmware_version = None
@@ -341,7 +345,7 @@ class FitBit(ANTlibusb):
             self.in_mode_bsl = None
             self.on_charger = None
 
-        def get_packet_id(self):
+        def gen_packet_id(self):
             self.current_packet_id = 0x38 + self.tracker_packet_count.next()
             return self.current_packet_id
 
@@ -375,6 +379,10 @@ class FitBit(ANTlibusb):
         super(FitBit, self).__init__(debug=debug)
         self.tracker = None
 
+    def get_device_id(self):
+        # this is such a stupid hacky way to do this.
+        return ''.join([chr(x) for x in self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0, 0x3c)[2::2]])
+
     def open(self):
         return super(FitBit, self).open(0x10c4, 0x84c4)
 
@@ -393,35 +401,56 @@ class FitBit(ANTlibusb):
         self._connection.ctrl_transfer(0xC0, 0xFF, 0x370B, 0x0, 1)
         self._connection.ctrl_transfer(0x40, 0x03, 0x800, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x13, 0x0, 0x0, \
-                                           [0x08, 0x00, 0x00, 0x00,
-                                            0x40, 0x00, 0x00, 0x00,
-                                            0x00, 0x00, 0x00, 0x00,
-                                            0x00, 0x00, 0x00, 0x00
-                                            ])
+                                       [0x08, 0x00, 0x00, 0x00,
+                                        0x40, 0x00, 0x00, 0x00,
+                                        0x00, 0x00, 0x00, 0x00,
+                                        0x00, 0x00, 0x00, 0x00
+                                        ])
         self._connection.ctrl_transfer(0x40, 0x12, 0x0C, 0x0, [])
         try:
             self._receive()
         except usb.USBError:
             pass
 
-
         # We get an ant reset message after doing all of this, that
         # I'm going to guess means we're connected and running. Not
         # seeing it in the USB analyzer logs, but whatever.
         # self._check_reset_response()
 
+    def init_fitbit(self):
+        self.fitbit_control_init()
+
+        # Run a whole bunch of descriptor stuff. Not sure why, just
+        # replaying what I see.
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0200, 0x00, 0x20)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0300, 0x00, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0301, 0x0409, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
+        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
+
+        self.init_device_channel([0xff, 0xff, 0x01, 0x01])
+
+    def init_tracker_for_transfer(self):
+        # self._connection.reset()
+        # self.init_fitbit()
+        # self.wait_for_beacon()
+        # self.reset_tracker()
+
+        # # 0x78 0x02 is device id reset. This tells the device the new
+        # cid = [random.randint(0,254), random.randint(0,254)]
+        # self.send_acknowledged_data([0x78, 0x02] + cid + [0x00, 0x00, 0x00, 0x00])
+        # self.close_channel()
+        # self.init_device_channel(cid + [0x01, 0x01])
+        # self.wait_for_beacon()
+        # self.ping_tracker()
+        self.tracker = self.FitBitTracker()
+
     def reset_tracker(self):
         # 0x78 0x01 is apparently the device reset command
         self.send_acknowledged_data([0x78, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-
-    def init_tracker_for_transfer(self):
-        # 0x78 0x02 is device id reset. This tells the device the new
-        cid = [random.randint(0,254), random.randint(0,254)]
-        self.send_acknowledged_data([0x78, 0x02] + cid + [0x00, 0x00, 0x00, 0x00])
-        self.close_channel()
-        self.init_device_channel(cid + [0x01, 0x01])
-        self.wait_for_beacon()
-        self.tracker = self.FitBitTracker()
         
     def wait_for_beacon(self):
         # FitBit device initialization
@@ -445,21 +474,6 @@ class FitBit(ANTlibusb):
         self.set_channel_id(channel)
         self.open_channel()
 
-    def init_fitbit(self):
-        self.fitbit_control_init()
-
-        # Run a whole bunch of descriptor stuff. Not sure why, just
-        # replaying what I see.
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0200, 0x00, 0x20)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0300, 0x00, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0301, 0x0409, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
-
-        self.init_device_channel([0xff, 0xff, 0x01, 0x01])
         
     def _get_tracker_burst(self):
         d = self._check_burst_response()
@@ -470,27 +484,44 @@ class FitBit(ANTlibusb):
             return []
         return d[8:8+size]
 
-    def send_tracker_control_packet(self, index):
-        self.send_tracker_packet([0x70, 0x00, 0x02, index, 0x00, 0x00, 0x00])
-        return self._get_tracker_burst()
-
-    def get_tracker_info(self):
-        # Device data retrieval
-        self.tracker.parse_info_packet(self.send_tracker_control_packet(0x0))
-        print self.tracker
-
-    def send_tracker_packet(self, packet, expected_response = None):
-        self.send_acknowledged_data([self.tracker.get_packet_id()] + packet)
-        if expected_response is not None:
-            self.check_tracker_response(expected_response)
-
-    def check_tracker_response(self, response):
+    def run_opcode(self, opcode, payload = None):
+        self.send_tracker_packet(opcode)
         data = self.receive_acknowledged_reply()
         if data[0] != self.tracker.current_packet_id:
-            raise Exception("Tracker Packet IDs don't match! %s %s", (data[0], self.tracker.current_packet_id))
-        if data[1:] != response:
-            raise Exception("Tracker Packet responses don't match! %s %s", (data[1:], response))
+            raise Exception("Tracker Packet IDs don't match! %02x %02x" % (data[0], self.tracker.current_packet_id))
+        if data[1] == 0x42:
+            return self.get_data_bank()
+        if data[1] == 0x61:
+            # Send payload data to device
+            if payload is not None:
+                self.send_tracker_payload(payload)
+        if data[1] == 0x41:
+            return None
 
+    def send_tracker_payload(self, payload):
+        p = [0x00, self.tracker.gen_packet_id(), 0x61, len(payload), 0x00, 0x00, 0x00, 0x00, 0x00]
+        prefix = itertools.cycle([0x20, 0x40, 0x60])
+        for i in range(0, len(payload), 8):
+            current_prefix = prefix.next()
+            plist = []
+            if i+8 >= len(payload):
+                plist += [(current_prefix + 0x80) | self._chan]
+            else:
+                plist += [current_prefix | self._chan]
+            plist += payload[i:i+8]
+            p += plist
+        print ["%02x" % (x) for x in p]
+        self._send_burst_data(p)
+    
+    def get_tracker_info(self):
+        data = self.run_opcode([0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+        self.tracker.parse_info_packet(data)
+        return data
+
+    def send_tracker_packet(self, packet):
+        p = [self.tracker.gen_packet_id()] + packet
+        self.send_acknowledged_data(p)
+    
     def ping_tracker(self):
         self.send_acknowledged_data([0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
@@ -498,20 +529,20 @@ class FitBit(ANTlibusb):
         self.send_tracker_packet([0x60, 0x00, 0x02, index, 0x00, 0x00, 0x00])
         return self._get_tracker_burst()
 
-    def get_data_bank(self, index, stride):        
-        self.send_tracker_packet([0x22, index, 0x00, 0x00, 0x00, 0x00, 0x00])
+    def run_data_bank_opcode(self, index):        
+        return self.run_opcode([0x22, index, 0x00, 0x00, 0x00, 0x00, 0x00])
+        
+    def get_data_bank(self):
         data = []
         while 1:
             try:
                 bank = self.check_tracker_data_bank(self.tracker.current_bank_id)
+                self.tracker.current_bank_id += 1
             except ANTReceiveException:
                 continue
-            self.tracker.current_bank_id += 1
             if len(bank) == 0:
-                for i in range(0, len(data), stride):
-                    print ["%02x" %(x) for x in data[i:i+stride]]
                 return data
-            data = data + bank                
+            data = data + bank           
         
     def transfer(self):
         # Goal of the transfer function: None of these should be
@@ -524,23 +555,17 @@ class FitBit(ANTlibusb):
         # URL REQUEST HERE
         # This is where we get the first opcode for pinging
 
-        # Ping Command
-        self.ping_tracker()
-        self.send_tracker_packet([0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-                                 [0x42, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
-
         # Get tracker info starts us at 0x0. Each call increases by
         # one, be it to a databank or a configuration query.
-        self.get_tracker_info()
 
+        self.get_tracker_info()
+        print self.tracker
+        
         # The rules after we pick up the tracker info get a little
         # freaky. This ignores the beginning increasing index byte,
         # we're just talking about commands here.
         #
-        # First off, we send an opcode, from the array listed below
-
-        opcode_array = [0x05, 0x04, 0x02, 0x00, 0x01]
-                   
+        # First off, we send an opcode.
         # Opcode should return us a status like
         #
         # 0x42
@@ -580,30 +605,31 @@ class FitBit(ANTlibusb):
         # --> 0x22 0x04
         # etc...
 
-        self.get_data_bank(0x05, 1000)
-        self.get_data_bank(0x04, 1000)
-        self.get_data_bank(0x02, 13)
-        self.get_data_bank(0x00, 7)
-        self.get_data_bank(0x01, 14)
-
-        # for opcode in opcode_array:
-        #     self.get_data_bank(opcode)
-
+        self.run_data_bank_opcode(0x05)
+        self.run_data_bank_opcode(0x04)
+        d = self.run_data_bank_opcode(0x02) # 13
+        for i in range(0, len(d), 13):
+            print ["%02x" % x for x in d[i:i+13]]
+        d = self.run_data_bank_opcode(0x00) # 7
+        print ["%02x" % x for x in d[0:7]]
+        print ["%02x" % x for x in d[7:14]]
+        j = 0
+        for i in range(14, len(d), 3):
+            print d[i:i+3]
+            j += 1
+        print "Records: %d" % (j)
+        d= self.run_data_bank_opcode(0x01) # 14
+        for i in range(0, len(d), 14):
+            print ["%02x" % x for x in d[i:i+14]]
+        
         # URL REQUEST HERE
         # This is where we ship everything back to the mothership
 
         # somewhere down here, we would erase data. If only we knew how.
 
     def run_transfer(self):
-        self._connection.reset()
-        self.init_fitbit()
-        self.wait_for_beacon()
-        self.reset_tracker()
         self.init_tracker_for_transfer()
         self.transfer()
-
-    def run_opcode(self, opcode):
-        pass
 
 def main():
     device = FitBit(True)
