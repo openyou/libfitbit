@@ -276,7 +276,7 @@ class ANT(object):
 
         if self._debug:
             print "--> " + hexRepr(self._transmitBuffer)
-        # return self._send(self._transmitBuffer)
+        return self._send(self._transmitBuffer)
 
     def _receive(self, size=4096):
         raise Exception("Need to define _receive function for ANT child class!")
@@ -391,13 +391,13 @@ class FitBit(ANTlibusb):
         # bmRequestType, bmRequest, wValue, wIndex, data
         self._connection.ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
-        # # At this point, we get a 4096 buffer, then start all over
-        # # again? Apparently doesn't require an explicit receive
+        # At this point, we get a 4096 buffer, then start all over
+        # again? Apparently doesn't require an explicit receive
         self._connection.ctrl_transfer(0x40, 0x00, 0x0, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x01, 0x4A, 0x0, [])
-        # # Receive 1 byte, should be 0x2
+        # Receive 1 byte, should be 0x2
         self._connection.ctrl_transfer(0xC0, 0xFF, 0x370B, 0x0, 1)
         self._connection.ctrl_transfer(0x40, 0x03, 0x800, 0x0, [])
         self._connection.ctrl_transfer(0x40, 0x13, 0x0, 0x0, \
@@ -434,18 +434,18 @@ class FitBit(ANTlibusb):
         self.init_device_channel([0xff, 0xff, 0x01, 0x01])
 
     def init_tracker_for_transfer(self):
-        # self._connection.reset()
-        # self.init_fitbit()
-        # self.wait_for_beacon()
-        # self.reset_tracker()
+        self._connection.reset()
+        self.init_fitbit()
+        self.wait_for_beacon()
+        self.reset_tracker()
 
-        # # 0x78 0x02 is device id reset. This tells the device the new
-        # cid = [random.randint(0,254), random.randint(0,254)]
-        # self.send_acknowledged_data([0x78, 0x02] + cid + [0x00, 0x00, 0x00, 0x00])
-        # self.close_channel()
-        # self.init_device_channel(cid + [0x01, 0x01])
-        # self.wait_for_beacon()
-        # self.ping_tracker()
+        # 0x78 0x02 is device id reset. This tells the device the new
+        cid = [random.randint(0,254), random.randint(0,254)]
+        self.send_acknowledged_data([0x78, 0x02] + cid + [0x00, 0x00, 0x00, 0x00])
+        self.close_channel()
+        self.init_device_channel(cid + [0x01, 0x01])
+        self.wait_for_beacon()
+        self.ping_tracker()
         self.tracker = self.FitBitTracker()
 
     def reset_tracker(self):
