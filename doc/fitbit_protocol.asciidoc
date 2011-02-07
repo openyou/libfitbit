@@ -10,13 +10,26 @@ protocol to talk to a base, connected to a computer via USB. This
 document outlines communication both with the base unit/device via
 USB, as well as synchronizing with fitbit's web service.
 
-== References
+== Important Document Information
+
+=== References
 
 We recommend the following references to go along with this document:
 
 - ANT Message and Protocol Documentation: http://www.thisisant.com/images/Resources/PDF/1204662412_ant%20message%20protocol%20and%20usage.pdf
 - FitBit FAQ: http://www.fitbit.com/faq
 - FitBit Manual: http://www.fitbit.com/manual
+
+=== Terminology
+
+- Base: Refers to the ANT base station, connected by USB to the host
+  computer.
+- Tracker: The clip-on Fitbit device
+
+=== Packet Documentation
+
+When packets layouts are show in this document, we use the full ANT
+packet to keep things consistent. 
 
 == What We Don't Know
 
@@ -32,12 +45,6 @@ the fitbit's protocol and client yet.
   means
 - How authentication setup with the website works
 - How device bonding with the website account works
-
-== Terminology
-
-- Base: Refers to the ANT base station, connected by USB to the host
-  computer.
-- Tracker: The clip-on Fitbit device
 
 == Reverse Engineering Methodology
 
@@ -196,11 +203,34 @@ listed below):
 - Website replies with command to close tracker, and have the beacon
   sleep for 15 minutes (probably conserves power).
 
+=== Web Response XML Schema
+
 == Fitbit Communication
+
+This section covers communicate with the base and tracker via USB
+and ANT. It is assumed that the reader is familiar with the USB and
+ANT protocols. For those not familiar with ANT, it's fairly easy to
+follow along with the Message and Protocol documentation in the
+references section. For those not familiar with USB, go outside and
+play. Preferably with your fitbit on.
 
 === Base Initialization
 
+Initializing the base unit happens whenever the unit is plugged in, or
+the client program is brought up. This consists of sending USB control
+messages and ANT protocol messages to configure the device to the
+right baud rate, channel, etc...
+
 === Establishing Tracker Communication
+
+Once the base is configured, it starts sending out read requests on
+channel 0. Assuming it hasn't been told to sleep, the tracker sends
+out a beacon once a second on channel 0. The beacon is a data packet
+that looks like:
+
+------
+A4 09 4E 00 00 00 00 00 00 00 00 00 E3
+------
 
 === Querying Tracker Information
 
