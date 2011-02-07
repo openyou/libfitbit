@@ -1,0 +1,112 @@
+= Fitbit Protocol Documentation
+By Kyle Machulis <kyle@nonpolynomial.com>
+Version 0.1, February 6, 2011
+
+== Introduction
+
+The Fitbit is a small clipon accelerometer that functions as a
+pedometer, distance meter, and calorie counter. It uses the ANT
+protocol to talk to a base, connected to a computer via USB. This
+document outlines communication both with the base unit/device via
+USB, as well as synchronizing with fitbit's web service.
+
+== References
+
+We recommend the following references to go along with this document:
+
+- ANT Message and Protocol Documentation: http://www.thisisant.com/images/Resources/PDF/1204662412_ant%20message%20protocol%20and%20usage.pdf
+- FitBit FAQ: http://www.fitbit.com/faq
+- FitBit Manual: http://www.fitbit.com/manual
+
+== Terminology
+
+- Base: Refers to the ANT base station, connected by USB to the host
+  computer.
+- Tracker: The clip-on Fitbit device
+
+== Reverse Engineering Methodology
+
+Reverse engineering the Fitbit is relatively easy. From the USB side,
+it is not using encryption to talk to the base station, and it
+communicates using an unmodified ANT protocol, so the basic gist of
+messages can be learned simply by reading the ANT protocol
+documentation. Any USB based filter driver may be used to log the data
+flowing to and from the base station.
+
+For further analysis, the Fitbit's service logs are amazingly
+helpful. For the windows installation of the Fitbit software, the logs
+are located at
+
+C:\Documents and Settings\All Users\Application Data\Fitbit\Tracker\logs
+
+Daily logs are stored in plain text with the filename format
+
+log-YYYYDDMMHHMMSS.txt
+
+There may be multiple log files generated. Each log file has a
+complete record of both USB and website communications, with copious
+amounts of annotation. Each call to and response from the device and
+website is logged and even sometimes documented.
+
+While working on the web communication, it was also found that error
+messages about communications flow were quite helpful. Errors are
+served as a comment block at the beginning of a response. For example:
+
+------
+<!-- Error: getDeviceInfoHandler should be getting result of one opCodes -->
+
+<!-- Error: Tracker object is null. This is impossible within normal
+flow. Something is hitting
+com.fitbit.app.device.tracker.dumpData.DumpDataActionBeanviolating a
+predefined flow. -->
+------
+
+These logs and messages were massively helpful in finishing the web
+protocol commmunication. Many thanks to the fitbit engineers for
+writing readable error messages and logs.
+
+=== Issues With User Security
+
+Not everything is happiness and sunshine, however.
+
+While information stored on Fitbit's website may not be of the utmost
+privacy importance (though having random people know when you sleep is
+a little creepy), this information should still be guarded by at least
+semisecure means. However, there are multiple situations where this is
+not the case.
+
+During initial login via the client software, user passwords are
+passed to the website as part of POST data, in the clear. They are
+also stored to the text log files in the clear. This can be seen in
+the following log block, with my personal account data removed.
+
+------
+01/28 23:31:55 Sending 4357 bytes of HTML to UI...
+01/28 23:31:55 Processing request...
+01/28 23:31:55 Waiting for minimum display time to elapse [1000ms]...
+01/28 23:31:56 Waiting for form input...
+01/28 23:31:57 [POWER EVENT] POWER STATUS CHANGE
+01/28 23:32:04 [POWER EVENT] POWER STATUS CHANGE
+01/28 23:32:14 UI [\\.\pipe\Fitbit|kyle]: F
+01/28 23:32:14 Processing action 'form'...
+01/28 23:32:14 Received form input: email=[YOUR UNENCRYPTED EMAIL HERE]&password=[YOUR UNENCRYPTED PASSWORD HERE]&[other stuff]
+01/28 23:32:14 Connecting [2]: POST to http://client.fitbit.com:80/device/tracker/pairing/signupHandler with data: 
+               email=[YOUR UNENCRYPTED EMAIL HERE]&password=[YOUR UNENCRYPTED PASSWORD HERE]&[other stuff]
+01/28 23:32:14 Processing action 'http'...
+01/28 23:32:14 Received HTTP response:
+------
+
+The URLs and POST data are saved, and the processing action is "http",
+not "https". Oddly enough, login on Fitbit's actual website is https.
+
+When syncing data to the website, no authentication is used, and all
+requests are sent in clear http. The tracker ID is bonded to the
+account of the user, and when the website receives the tracker ID, it
+responds with the user ID. Once again, since all of this happens in
+the clear, it would be easy to inject data into anyone's account, via
+either ANT or website sniffing. Why one would do this is beyond me,
+just saying, is all.
+
+== Website Sync Communication
+
+== Device Communication
