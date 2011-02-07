@@ -89,7 +89,7 @@ class FitBitClient(object):
         self.info_dict["beaconType"] = "standard"
         self.info_dict["clientMode"] = "standard"
         self.info_dict["clientVersion"] = "1.3.3"
-        self.info_dict["os"] = "Linux"
+        self.info_dict["os"] = "Commodore 64"
         self.info_dict["clientId"] = self.CLIENT_UUID
         if self.remote_info:
             self.info_dict = dict(self.info_dict, **self.remote_info)
