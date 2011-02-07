@@ -314,8 +314,10 @@ class ANTlibusb(ANT):
 
     def _receive(self, size=4096):
         r = self._connection.read(self.ep['in'], size, 0, self.timeout)
+        if len(r) == 0:
+            return r
         checksum = reduce(operator.xor, r[:-1])
-        if len(r) == 0 or checksum != r[-1]:
+        if checksum != r[-1]:
             raise ANTReceiveException("Checksums for packet do not match received values!")
         if self._debug:
             self.data_received(''.join(map(chr, r)))
@@ -502,7 +504,7 @@ class FitBit(ANTlibusb):
             return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
     def send_tracker_payload(self, payload):
-        p = [0x00, self.tracker.gen_packet_id(), 0x61, len(payload), 0x00, 0x00, 0x00, 0x00, 0x00]
+        p = [0x00, self.tracker.gen_packet_id(), 0x80, len(payload), 0x00, 0x00, 0x00, 0x00, 0x00]
         prefix = itertools.cycle([0x20, 0x40, 0x60])
         for i in range(0, len(payload), 8):
             current_prefix = prefix.next()
@@ -511,7 +513,9 @@ class FitBit(ANTlibusb):
                 plist += [(current_prefix + 0x80) | self._chan]
             else:
                 plist += [current_prefix | self._chan]
-            plist += payload[i:i+8]
+            plist += map(ord, payload[i:i+8])
+            while len(plist) < 9:
+                plist += [0x0]
             p += plist
         self._send_burst_data(p)
     

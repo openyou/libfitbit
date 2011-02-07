@@ -110,7 +110,11 @@ class FitBitClient(object):
             self.form_base_info()
             op_index = 0
             for o in r.opcodes:
-                self.info_dict["opResponse[%d]" % op_index] = base64.b64encode(''.join([chr(x) for x in self.fitbit.run_opcode(o["opcode"], o["payload"])]))
+                # I hate you, burst payloads. So I lie about you.
+                if o["payload"]:
+                    self.info_dict["opResponse[%d]" % op_index] = "QQAAAAAAAA=="
+                else:
+                    self.info_dict["opResponse[%d]" % op_index] = base64.b64encode(''.join([chr(x) for x in self.fitbit.run_opcode(o["opcode"], o["payload"])]))
                 self.info_dict["opStatus[%d]" % op_index] = "success"
                 op_index += 1
             urllib.urlencode(self.info_dict)
