@@ -28,8 +28,17 @@ We recommend the following references to go along with this document:
 
 === Packet Documentation
 
-When packets layouts are show in this document, we use the full ANT
-packet to keep things consistent. 
+Packet layouts in this document will use the full ANT packet to keep
+things consistent. The packet layout is documented in the
+protocol/message document, but is also listed here for sake of
+clarity:
+
+* Byte 0x0: Always 0xA4
+* Byte 0x1: Packet Data Length (up to 0x9)
+* Byte 0x2: Packet Type
+* Byte 0x2 + Packet Data Length: 8-bit checksum consisting of XOR'd
+  bytes of packet. In packet layouts where we have variable bytes, the
+  checksum is represented as ??.
 
 == What We Don't Know
 
@@ -221,6 +230,49 @@ the client program is brought up. This consists of sending USB control
 messages and ANT protocol messages to configure the device to the
 right baud rate, channel, etc...
 
+To start setting up the base station, we send a bank of control
+messages. The following is the control messages from the python
+library, with
+
+* Argument 1: bmRequestType
+* Argument 2: bmRequest
+* Argument 3: wValue
+* Argument 4: wIndex
+* Argument 5: data (If a list, send data. If an int, receive data.)
+
+------
+ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
+ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
+ctrl_transfer(0x40, 0x00, 0x0, 0x0, [])
+ctrl_transfer(0x40, 0x00, 0xFFFF, 0x0, [])
+ctrl_transfer(0x40, 0x01, 0x2000, 0x0, [])
+ctrl_transfer(0x40, 0x01, 0x4A, 0x0, [])
+# Receive 1 byte, should be 0x2
+ctrl_transfer(0xC0, 0xFF, 0x370B, 0x0, 1)
+ctrl_transfer(0x40, 0x03, 0x800, 0x0, [])
+ctrl_transfer(0x40, 0x13, 0x0, 0x0,
+              [0x08, 0x00, 0x00, 0x00,
+               0x40, 0x00, 0x00, 0x00,
+               0x00, 0x00, 0x00, 0x00,
+               0x00, 0x00, 0x00, 0x00])
+ctrl_transfer(0x40, 0x12, 0x0C, 0x0, [])
+------
+
+We then receive a packet of information, usually a reset validation
+packet.
+
+After this, we initialize the base channel (via ANT messages) to:
+
+* Period: 0x1000
+* Frequency: 0x2
+* Transmit Power: 0x3
+* Search Timeout: 0xFF
+* Channel ID - Device Number: 0xFFFF, Device Type ID: 0x01, Trans
+  Type: 0x01
+
+This sets up the base to listen for the beacon packet from the tracker
+device.
+
 === Establishing Tracker Communication
 
 Once the base is configured, it starts sending out read requests on
@@ -229,10 +281,89 @@ out a beacon once a second on channel 0. The beacon is a data packet
 that looks like:
 
 ------
-A4 09 4E 00 00 00 00 00 00 00 00 00 E3
+--> A4 09 4E 00 00 00 00 00 00 00 00 00 E3
 ------
 
+Once the beacon is received by the base station, the base station
+sends a reset packet:
+
+------
+--> A4 09 4F 00 78 00 00 00 00 00 00 00 9A
+------
+
+Then, assuming the tracker is not on the base, it sends a "Channel
+Hop" message:
+
+------
+--> A4 09 4F 00 78 02 XX XX 00 00 00 00 ??
+------
+
+Where XXXX is a random 16-bit little-endian number denote the new
+channel for the device to talk on. The device and base switch to that
+channel, and the base runs the channel initialization sequences listed
+in the last step again, except this time with the channel ID set to
+the XXXX value instead of 0xFFFF. The base waits for the device beacon
+on this channel, and once received, initializes transfer.
+
+=== Talking to the Tracker
+
+Non-burst-data packets to the tracker take the form:
+
+.Sent Packet
+------
+--> A4 09 4F 00 3W XX 00 00 00 00 00 00 ??
+------
+
+* W - Starts at 0x9, increments on every new packet send, wraps at 0xF
+  to 0x8.
+* XX - Command to send
+* All bytes after YY up to checksum - Data
+
+We will usually get two packets back from the tracker
+
+.Received Packet
+------
+<-- A4 03 40 00 01 05 E3
+<-- A4 09 4F 00 3Y ZZ 00 00 00 00 00 00 ??
+------
+
+* Y - Should match W from packet sent
+* ZZ - Return status
+
+If burst data is sent after the status is received, burst data packets
+will follow the 0x2X/0x4X/0x6X format outlined in the ANT
+documentation. See the ANT documentation on burst transfers for more
+info.
+
 === Querying Tracker Information
+
+Now that the base is connected to the tracker, we can start querying
+the tracker for information about itself.
+
+------
+--> A4 09 4F 00 3X 24 00 00 00 00 00 00 ?? - Query 
+<-- A4 03 40 00 01 05 E3                   - ANT Acknowledgment
+<-- A4 09 4F 00 3X 42 00 00 00 00 00 00 ?? - Device Contact Success
+--> A4 09 4F 00 3Y 70 00 02 00 00 00 00 ?? - Query for Info
+<-- A4 03 40 00 01 05 E3                   - ANT Acknowledgment
+<-- A4 09 50 00 3Y 81 0C 00 00 00 00 ?? ?? - Start burst, 0x0C length, bytes after length random?
+<-- A4 09 50 20 GG GG GG GG GG HH II JJ ?? - Device Data
+<-- A4 09 50 C0 KK LL MM NN OO 00 D9 BD ?? - More Device Data
+------
+
+Taking the last two Device Data Portions:
+
+* Bytes 0-4 (G) - 5 byte Device Serial Number
+* Byte 5 (H) - Firmware Version
+* Byte 6 (I) - BSL Major Version
+* Byte 7 (J) - BSL Minor Version (i.e. II.JJ = bsl version)
+* Byte 8 (K) - App Major Version
+* Byte 9 (L) - App Minor Version
+* Byte 10 (M) - In BSL Mode
+* Byte 11 (N) - Is Device currently on the charger?
+* Byte 12 (O) - Unknown?
+
+All remaining bytes up until checksum are ignored, can be anything.
 
 === Data Dumping
 
