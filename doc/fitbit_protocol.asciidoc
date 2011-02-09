@@ -434,12 +434,12 @@ portion of the communications.
 
 === Second Data - Data Type ID 0x2
 
-.Example
+.Example Packet
 ------
 e0 1d 52 4d 0f 02 05 85 00 00 e3 0b 00
 ------
 
-.Layout
+.Packet Layout
 ------
 XX XX XX XX ?? ?? ?? ?? ?? ?? ?? ?? ?? ??
 ------
@@ -448,7 +448,7 @@ XX XX XX XX ?? ?? ?? ?? ?? ?? ?? ?? ?? ??
 
 === Minute Interval Data - Data Type ID 0x0
 
-.Example
+.Example Packet
 ------
 4d 52 22 c0 
 81 1c 00
@@ -457,7 +457,7 @@ XX XX XX XX ?? ?? ?? ?? ?? ?? ?? ?? ?? ??
 85 1c 13
 ------
 
-.Layout
+.Packet Layout
 ------
 XX XX XX XX 
 MM NN OO
@@ -470,12 +470,12 @@ MM NN OO
 
 === Daily/Per Sync Data - Data Type ID 0x1
 
-.Example
+.Example Packet
 ------
 72 24 52 4d 92 50 2a 2f 00 00 5b c9 8c 00
 ------
 
-.Layout
+.Packet Layout
 ------
 XX XX XX XX ?? ?? YY YY ?? ?? ?? ?? ?? ??
 ------
