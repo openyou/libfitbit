@@ -66,6 +66,14 @@ it's not an HID device.
 
 Don't even know if it works there yet. :D
 
+== Future Plans ==
+
+* Breaking ANT access library out into its own repo
+* Windows support
+* Finish figuring out data types
+* Finish full replay of web opcodes (Still can't burst send to device)
+* Implement library in C
+
 == License ==
 
 ---------------------
