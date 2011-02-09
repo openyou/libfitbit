@@ -19,8 +19,14 @@ http://www.twitter.com/mattcutts
 
 libfitbit is an implementation of the data retrieval protocol for the
 fitbit health tracking device. It also implements a synchronization
-client for synchronizing data with the fitbit website on unsupported
-platforms.
+client for synchronizing data with the fitbit website on platforms not
+supported by Fitbit currently.
+
+The main goal of the library is to augment the services already
+provided by the fitbit website, allowing for developers to make
+interesting new applications that access the fitbit data in smaller
+time chunks on the local machine, as well as giving users the ability
+to back up their own data without having to rely on the web service.
 
 Currently, the library only implements a proof of concept of the
 protocol and web interface in python. This will be turned into a C

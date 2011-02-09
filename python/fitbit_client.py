@@ -110,7 +110,9 @@ class FitBitClient(object):
             self.form_base_info()
             op_index = 0
             for o in r.opcodes:
-                # I hate you, burst payloads. So I lie about you.
+                # I hate you, burst payloads. So I lie about you. 
+                # For anyone reading this, you have been warned: I
+                # don't know what I'm doing here. :D
                 if o["payload"]:
                     self.info_dict["opResponse[%d]" % op_index] = "QQAAAAAAAA=="
                 else:

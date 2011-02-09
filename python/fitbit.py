@@ -186,6 +186,7 @@ class FitBit(ANTlibusb):
         self.reset_tracker()
 
         # 0x78 0x02 is device id reset. This tells the device the new
+        # channel id to hop to for dumpage
         cid = [random.randint(0,254), random.randint(0,254)]
         self.send_acknowledged_data([0x78, 0x02] + cid + [0x00, 0x00, 0x00, 0x00])
         self.close_channel()
