@@ -216,11 +216,14 @@ listed below):
 
 == Fitbit Communication
 
-This section covers communicate with the base and tracker via USB
-and ANT. It is assumed that the reader is familiar with the USB and
-ANT protocols. For those not familiar with ANT, it's fairly easy to
-follow along with the Message and Protocol documentation in the
-references section. For those not familiar with USB, go outside and
+This section covers communicate with the base and tracker via USB and
+ANT, in the context of the synchronization communications with the
+website. 
+
+It is assumed that the reader is familiar with the USB and ANT
+protocols. For those not familiar with ANT, it's fairly easy to follow
+along with the Message and Protocol documentation in the references
+section. For those not familiar with USB, go outside and
 play. Preferably with your fitbit on.
 
 === Base Initialization
@@ -315,7 +318,7 @@ Non-burst-data packets to the tracker take the form:
 ------
 
 * W - Starts at 0x9, increments on every new packet send, wraps at 0xF
-  to 0x8.
+  to 0x8. From here on out, refered to as the sequence nibble.
 * XX - Command to send
 * All bytes after YY up to checksum - Data
 
@@ -367,13 +370,115 @@ All remaining bytes up until checksum are ignored, can be anything.
 
 === Data Dumping
 
+Once we've gotten the tracker information, it's time to pull the data
+off the device. We send the following packet to the tracker:
+
+------
+--> A4 09 4F 00 3W 22 0X 00 00 00 00 00 ??
+------
+
+* W - Sequence nibble
+* X - Data Type that burst requests will send back. Conjectures listed
+  below based on value.
+** 0 - Daily information, or information generated on every read of
+   the tracker?
+** 1 - 5 minute interval data
+** 2 - Second Information? Only seems to return last few seconds.
+** 3 - Haven't tried it
+** 4 - Unknown
+** 5 - Unknown
+
+After we send this, we get back the usual acknowledgement:
+
+------
+<--  A4 03 40 00 01 05 E3
+------
+
+And then begins the data dumping
+
+------
+-->  A4 09 4F 00 3W 60 00 02 XX 00 00 00 ??
+------
+
+* W - Sequence nibble
+* XX - Memory Bank ID we're querying
+
+The memory bank id goes from 00 to whenever we're out of data, which
+we can tell by the burst data returned from the command
+
+------
+<-- A4 03 40 00 01 05 E3
+<-- A4 09 50 00 3W 81 YY YY 00 00 00 ?? ??
+------
+
+* W - Matching sequence nibble for input command
+* YYYY - 16 bit little endian value for data length being transmitted,
+  starting at the beginning of the next packet. We get 8 bytes of data
+  per burst packet.
+
+If YYYY is 0, we know that we're querying a null bank, and have hit
+the end of the information type we're currently getting. We can append
+all of the data received from all burst commands for this data type.
+
 === Device Erasing
+
+I have no idea how this works. I'm just replaying what the website
+gives me right now. It sends over extra data, which could possibly be
+time synchronization, or information from the website (stride length,
+weight, etc?).
 
 == Data Formats
 
-=== Second Data
+This section outlines the data sent over during the "Data Dump"
+portion of the communications. 
 
-=== 5 Minute Interval Data
+=== Second Data - Data Type ID 0x2
 
-=== Daily/Per Sync Data
+.Example
+------
+e0 1d 52 4d 0f 02 05 85 00 00 e3 0b 00
+------
 
+.Layout
+------
+XX XX XX XX ?? ?? ?? ?? ?? ?? ?? ?? ?? ??
+------
+
+* XXXXXXXX - 32-bit little endian seconds since Jan 1 1970
+
+=== Minute Interval Data - Data Type ID 0x0
+
+.Example
+------
+4d 52 22 c0 
+81 1c 00
+4d 52 27 ac 
+85 19 00
+85 1c 13
+------
+
+.Layout
+------
+XX XX XX XX 
+MM NN OO
+------
+
+* XXXXXXXX - 32-bit little endian seconds since Jan 1 1970
+* MM - Unknown, always seems to start around 0x81?
+* NN - Unknown
+* OO - Unknown
+
+=== Daily/Per Sync Data - Data Type ID 0x1
+
+.Example
+------
+72 24 52 4d 92 50 2a 2f 00 00 5b c9 8c 00
+------
+
+.Layout
+------
+XX XX XX XX ?? ?? YY YY ?? ?? ?? ?? ?? ??
+------
+
+* XXXXXXXX - 32-bit little endian seconds since Jan 1 1970
+* YYYY - 16-bit little endian Steps since last day
