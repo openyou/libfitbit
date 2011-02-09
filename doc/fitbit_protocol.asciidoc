@@ -214,6 +214,38 @@ listed below):
 
 === Web Response XML Schema
 
+.Example XML Response
+------
+<?xml version="1.0" ?>
+<fitbitClient version="1.0">
+  <response host="client.fitbit.com"  path="/device/tracker/dumpData/dumpData" port="80">trackerPublicId=[REDACTED]&amp;userPublicId=[REDACTED]&amp;deviceInfo.serialNumber=[REDACTED]&amp;deviceInfo.hardwareRev=10&amp;deviceInfo.bslVerMajor=2&amp;deviceInfo.bslVerMinor=23&amp;deviceInfo.appVerMajor=2&amp;deviceInfo.appVerMinor=23&amp;deviceInfo.inModeBSL=false&amp;deviceInfo.onCharger=true&amp;parseData=on</response>
+  <device type="tracker" pingInterval="4000" action="command" >
+    <remoteOps errorHandler="executeTillError" responder="respondNoError">
+      <remoteOp encrypted="false">
+	<opCode>IgUAAAAAAA==</opCode>
+	<payloadData></payloadData>
+      </remoteOp>
+      <remoteOp encrypted="false">
+	<opCode>IgQAAAAAAA==</opCode>
+	<payloadData></payloadData>
+      </remoteOp>
+      <remoteOp encrypted="false">
+	<opCode>IgIAAAAAAA==</opCode>
+	<payloadData></payloadData>
+      </remoteOp>
+      <remoteOp encrypted="false">
+	<opCode>IgAAAAAAAA==</opCode>
+	<payloadData></payloadData>
+      </remoteOp>
+      <remoteOp encrypted="false">
+	<opCode>IgEAAAAAAA==</opCode>
+	<payloadData></payloadData>
+      </remoteOp>
+    </remoteOps>
+  </device>
+</fitbitClient>
+------
+
 == Fitbit Communication
 
 This section covers communicate with the base and tracker via USB and
