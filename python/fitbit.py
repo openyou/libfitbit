@@ -55,19 +55,18 @@
 # - FitBit Base Initialization
 # - FitBit Tracker Connection, Initialization, Info Retreival
 # - Blind data retrieval (can get it, don't know what it is)
-#
-# To Do (Big)
-#
 # - Talking to the fitbit website
-# - Dividing out into modules (ant classes may become their own library)
-# - Figuring out more data formats and packets
-# - Implementing data clearing
 # - Fix ANT Burst packet identifer
 # - Add checksum checks for ANT receive
 # - Fix packet status identifiers in ANT
+#
+# To Do (Big)
+#
+# - Dividing out into modules (ant classes may become their own library)
+# - Figuring out more data formats and packets
+# - Implementing data clearing
 
 import itertools
-import base64
 import sys
 import operator
 import struct
@@ -414,26 +413,21 @@ class FitBit(ANTlibusb):
         except usb.USBError:
             pass
 
-        # We get an ant reset message after doing all of this, that
-        # I'm going to guess means we're connected and running. Not
-        # seeing it in the USB analyzer logs, but whatever.
-        # self._check_reset_response()
-
     def init_fitbit(self):
         self.fitbit_control_init()
-
-        # Run a whole bunch of descriptor stuff. Not sure why, just
-        # replaying what I see.
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x02)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x00, 0x3c)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0200, 0x00, 0x20)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0300, 0x00, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0301, 0x0409, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0303, 0x0409, 0x01fe)
-        self._connection.ctrl_transfer(0x80, 0x06, 0x0302, 0x0409, 0x01fe)
-
         self.init_device_channel([0xff, 0xff, 0x01, 0x01])
+
+    def init_device_channel(self, channel):
+        # ANT device initialization
+        self.reset()
+        self.send_network_key(0, [0,0,0,0,0,0,0,0])
+        self.assign_channel()
+        self.set_channel_period([0x0, 0x10])
+        self.set_channel_frequency(0x2)
+        self.set_transmit_power(0x3)
+        self.set_search_timeout(0xFF)
+        self.set_channel_id(channel)
+        self.open_channel()
 
     def init_tracker_for_transfer(self):
         self._connection.reset()
@@ -464,19 +458,6 @@ class FitBit(ANTlibusb):
             except usb.USBError:
                 pass
 
-    def init_device_channel(self, channel):
-        # ANT device initialization
-        self.reset()
-        self.send_network_key(0, [0,0,0,0,0,0,0,0])
-        self.assign_channel()
-        self.set_channel_period([0x0, 0x10])
-        self.set_channel_frequency(0x2)
-        self.set_transmit_power(0x3)
-        self.set_search_timeout(0xFF)
-        self.set_channel_id(channel)
-        self.open_channel()
-
-        
     def _get_tracker_burst(self):
         d = self._check_burst_response()
         if d[1] != 0x81:
@@ -579,10 +560,7 @@ class FitBit(ANTlibusb):
         # After which, we send what I guess is the "databank opener"
         # command.
         #
-        # 0x70 0x00 0x02 0x0X
-        #
-        # (THIS MAY NOT BE RIGHT. I'm seeing opcodes followed by 0x60
-        # commands in the log.)
+        # 0x60 0x00 0x02 0x0X
         #
         # The X is a databank index, starting from 0 (which it
         # actually does back in our get_tracker_info function, but we
