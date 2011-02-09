@@ -6,6 +6,8 @@ Nonpolynomial Labs - http://www.nonpolynomial.com
 
 If you find libfitbit useful, please donate to the project at http://pledgie.com/campaigns/14375
 
+Thanks to Matt Cutts for hooking me up with the hardware - http://www.twitter.com/mattcutts
+
 == Description ==
 
 libfitbit is an implementation of the data retrieval protocol for the
