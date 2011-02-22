@@ -40,7 +40,7 @@ all that clear).
 
 == Package Information ==
 
-Source repo @ http://www.github.com/openyou/libfitbit
+Source repo @ http://www.github.com/qdot/libfitbit
 
 == Platform Support ==
 
