@@ -141,7 +141,11 @@ class ANT(object):
 
     def _check_reset_response(self):
         data = self._receive()
-        print ["%02x" % (x) for x in data]
+
+        # Sometimes we have to check for reset twice, if the first response is null
+        if len(data) == 0:
+            data = self._receive()
+
         if data[2] == 0x6f:
             return
         raise ANTStatusException("Reset expects message type 0x6f, got %02x" % (data[2]))
@@ -149,6 +153,9 @@ class ANT(object):
     def _check_ok_response(self):
         # response packets will always be 7 bytes
         status = self._receive()
+
+        if len(status) == 0:
+            raise ANTStatusException("No message response received!")
 
         if status[2] == 0x40 and status[5] == 0x0:
             return
