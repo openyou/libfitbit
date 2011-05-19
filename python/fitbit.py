@@ -70,6 +70,7 @@ import itertools
 import sys
 import usb
 import random
+import operator
 from antprotocol.protocol import ANTReceiveException
 from antprotocol.libusb import ANTlibusb
 
@@ -236,7 +237,9 @@ class FitBit(ANTlibusb):
             return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
 
     def send_tracker_payload(self, payload):
-        p = [0x00, self.tracker.gen_packet_id(), 0x80, len(payload), 0x00, 0x00, 0x00, 0x00, 0x00]
+        # The first packet will be the packet id, the length of the
+        # payload, and ends with the payload CRC
+        p = [0x00, self.tracker.gen_packet_id(), 0x80, len(payload), 0x00, 0x00, 0x00, 0x00, reduce(operator.xor, map(ord, payload))]
         prefix = itertools.cycle([0x20, 0x40, 0x60])
         for i in range(0, len(payload), 8):
             current_prefix = prefix.next()

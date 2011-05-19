@@ -45,9 +45,7 @@
 # Added to and untwistedized and fixed up by Kyle Machulis <kyle@nonpolynomial.com>
 #
 
-import operator
-import struct
-import array
+import operator, struct, array, time
 
 class ANTReceiveException(Exception):
     pass
@@ -218,7 +216,11 @@ class ANT(object):
     def _send_burst_data(self, data):
         for l in range(0, len(data), 9):            
             self._send_message(0x50, data[l:l+9])
-            
+            # TODO: This is a guess just to get the fitbit
+            # working. This should set based on the current channel
+            # timing. But .01 works for the moment.
+            time.sleep(.01)
+
     def _check_burst_response(self):
         response = []
         failure = False
