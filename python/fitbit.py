@@ -66,11 +66,8 @@
 # - Figuring out more data formats and packets
 # - Implementing data clearing
 
-import itertools
-import sys
+import itertools, sys, random, operator, datetime
 import usb
-import random
-import operator
 from antprotocol.protocol import ANTReceiveException
 from antprotocol.libusb import ANTlibusb
 
@@ -252,7 +249,9 @@ class FitBit(ANTlibusb):
             while len(plist) < 9:
                 plist += [0x0]
             p += plist
-        self._send_burst_data(p)
+        # TODO: Sending burst data with a guessed sleep value, should
+        # probably be based on channel timing
+        self._send_burst_data(p, .01)
 
     def get_tracker_info(self):
         data = self.run_opcode([0x24, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
@@ -285,6 +284,31 @@ class FitBit(ANTlibusb):
                 return data
             data = data + bank
 
+    def parse_bank2_data(self, data):
+        for i in range(0, len(data), 13):
+            print ["0x%.02x" % x for x in data[i:i+13]]
+            # First 4 bytes are seconds from Jan 1, 1980
+            print "Time: %s" % (datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24))
+
+    def parse_bank0_data(self, data):
+        print ["0x%.02x" % x for x in data]
+        # First 4 bytes are a time
+        i = 0
+        while i < len(data):
+            if not data[i] & 0x80:
+                print "Time: %s" % (datetime.datetime.fromtimestamp(data[i+3] | data[i+2] << 8 | data[i+1] << 16 | data[i] << 24))
+                i = i + 4
+            else:
+                print "%s" % [data[i], data[i+1], data[i+2]]
+                i = i + 3
+        
+        
+        # Read 3's until we get another time?
+        # for i in range(0, len(data), 13):
+        #     print ["0x%.02x" % x for x in data[i:i+13]]
+        #     # First 4 bytes are seconds from Jan 1, 1980
+        #     print "Time: %s" % (datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24))
+        return
 def main():
     device = FitBit(True)
     if not device.open():
@@ -293,79 +317,27 @@ def main():
 
     device.init_tracker_for_transfer()
 
-    # Goal of the transfer function: None of these should be
-    # "send_tracker_packet" calls. Everything should be named what
-    # it actually is.
+    # device.get_tracker_info()
+    # print device.tracker
 
-    # This is a replay of commands taken from the windows client
-    # logs.
-
-    # URL REQUEST HERE
-    # This is where we get the first opcode for pinging
-
-    # Get tracker info starts us at 0x0. Each call increases by
-    # one, be it to a databank or a configuration query.
-
-    device.get_tracker_info()
-    print device.tracker
-
-    # The rules after we pick up the tracker info get a little
-    # freaky. This ignores the beginning increasing index byte,
-    # we're just talking about commands here.
-    #
-    # First off, we send an opcode.
-    # Opcode should return us a status like
-    #
-    # 0x42
-    #
-    # After which, we send what I guess is the "databank opener"
-    # command.
-    #
-    # 0x60 0x00 0x02 0x0X
-    #
-    # The X is a databank index, starting from 0 (which it
-    # actually does back in our get_tracker_info function, but we
-    # have that hardcoded since we actually know what that data
-    # is.) X increases by 1 with every command
-    #
-    # This should get us back at least some data. We then continue
-    # emptying the databank using the "databank continue" commands
-    #
-    # 0x60 0x00 0x02 0x0X
-    #
-    # Once we hit a bank with no data, we send the next
-    # opcode. Repeat until we're out of opcodes.
-    #
-    # So, the whole loop looks like:
-    #
-    # --> 0x22 0x05 - Opcode
-    # <-- 0x01 0x05 - Success
-    # <-- 0x42 - Opcode Success?
-    # --> 0x70 0x00 0x02 0x02 - 0x70 command? MAY NOT BE RIGHT
-    # <-- 0x01 0x05
-    # <-- 0x81 [length] [lots of packets]
-    # --> 0x60 0x00 0x02 0x03 - 0x60 continuation command?
-    # <-- 0x01 0x05
-    # <-- 0x81 0x0 - We're out of data, start the next opcode.
-    # --> 0x22 0x04
-    # etc...
-
-    device.run_data_bank_opcode(0x05)
-    device.run_data_bank_opcode(0x04)
-    d = device.run_data_bank_opcode(0x02) # 13
-    for i in range(0, len(d), 13):
-        print ["%02x" % x for x in d[i:i+13]]
-    d = device.run_data_bank_opcode(0x00) # 7
-    print ["%02x" % x for x in d[0:7]]
-    print ["%02x" % x for x in d[7:14]]
-    j = 0
-    for i in range(14, len(d), 3):
-        print d[i:i+3]
-        j += 1
-    print "Records: %d" % (j)
-    d= device.run_data_bank_opcode(0x01) # 14
-    for i in range(0, len(d), 14):
-        print ["%02x" % x for x in d[i:i+14]]
+    device.parse_bank2_data(device.run_data_bank_opcode(0x02))
+    print "---"
+    device.parse_bank0_data(device.run_data_bank_opcode(0x00))
+    # device.run_data_bank_opcode(0x04)
+    # d = device.run_data_bank_opcode(0x02) # 13
+    # for i in range(0, len(d), 13):
+    #     print ["%02x" % x for x in d[i:i+13]]
+    # d = device.run_data_bank_opcode(0x00) # 7
+    # print ["%02x" % x for x in d[0:7]]
+    # print ["%02x" % x for x in d[7:14]]
+    # j = 0
+    # for i in range(14, len(d), 3):
+    #     print d[i:i+3]
+    #     j += 1
+    # print "Records: %d" % (j)
+    # d= device.run_data_bank_opcode(0x01) # 14
+    # for i in range(0, len(d), 14):
+    #     print ["%02x" % x for x in d[i:i+14]]
     device.close()
     return 0
 

@@ -89,20 +89,6 @@ class ANT(object):
                 if reduce(operator.xor, message[:-1]) != message[-1]:
                     print "RCV CORRUPT MSG: %s" % hexRepr(intListToByteList(message))
 
-                printBuffer = []
-                if message[2] == 0x40:
-                    printBuffer.append("MSG_RESPONSE_EVENT")
-                    printBuffer.append("CHAN:%02x" % message[3])
-                    printBuffer.append(self._event_to_string(message[4]))
-                    printBuffer.extend(hexList(intListToByteList(message[5:-1])))
-                    printBuffer.append("CHKSUM:%02x" % message[-1])
-                    # if message[4] == 1:
-                        # reactor.callLater(self._messageDelay, self.opench)
-                else:
-                    printBuffer = hexRepr(intListToByteList(message))
-
-                # print "<-- " + repr(printBuffer)
-
     def _event_to_string(self, event):
         try:
             return { 0:"RESPONSE_NO_ERROR",
@@ -213,13 +199,12 @@ class ANT(object):
             if len(status) > 0 and status[2] == 0x40 and status[5] == 0x5:
                 break
 
-    def _send_burst_data(self, data):
+    def _send_burst_data(self, data, sleep = None):
         for l in range(0, len(data), 9):            
             self._send_message(0x50, data[l:l+9])
-            # TODO: This is a guess just to get the fitbit
-            # working. This should set based on the current channel
-            # timing. But .01 works for the moment.
-            time.sleep(.01)
+            # TODO: Should probably base this on channel timing
+            if sleep != None:
+                time.sleep(sleep)
 
     def _check_burst_response(self):
         response = []
