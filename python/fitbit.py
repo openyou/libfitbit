@@ -291,7 +291,6 @@ class FitBit(ANTlibusb):
             print "Time: %s" % (datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24))
 
     def parse_bank0_data(self, data):
-        print ["0x%.02x" % x for x in data]
         # First 4 bytes are a time
         i = 0
         last_date_time = 0
@@ -306,22 +305,27 @@ class FitBit(ANTlibusb):
                 i = i + 4
                 time_index = 0
             else:
+                record_date = (datetime.datetime.fromtimestamp(last_date_time + 60 * time_index))
                 # steps are easy. It's just the last byte
                 steps = data[i+2] 
-                # active score: second byte, subtract 10, divide by
-                # 10. I don't know why.
-                active_score = (data[i+1] - 10) / 10
+                # active score: second byte, subtract 10 (because METs
+                # start at 1 but 1 is subtracted per minute, see
+                # asterisk note on fitbit website, divide by 10.
+                active_score = (data[i+1] - 10) / 10.0
                 # first byte: I don't know. It starts at 0x81. So we at least subtract that.
-                print "%s: ???: %d Active Score: %d Steps: %d" % ((datetime.datetime.fromtimestamp(last_date_time + 60 * time_index)), data[i] & 0x0f, data[i+1], data[i+2])
+                not_sure = data[i] - 0x81
+                print "%s: ???: %d Active Score: %f Steps: %d" % (record_date, not_sure, active_score, steps)
                 i = i + 3
-                time_index = time_index + 1
+                time_index = time_index + 1        
+
+    def parse_bank1_data(self, data):
+        for i in range(0, len(data), 14):
+            print ["0x%.02x" % x for x in data[i:i+13]]
+            # First 4 bytes are seconds from Jan 1, 1980
+            daily_steps = data[i+7] << 8 | data[i+6]
+            record_date = datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24)
+            print "Time: %s Daily Steps: %d" % (record_date, daily_steps) 
         
-        # Read 3's until we get another time?
-        # for i in range(0, len(data), 13):
-        #     print ["0x%.02x" % x for x in data[i:i+13]]
-        #     # First 4 bytes are seconds from Jan 1, 1980
-        #     print "Time: %s" % (datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24))
-        return
 def main():
     device = FitBit(True)
     if not device.open():
@@ -348,7 +352,8 @@ def main():
     #     print d[i:i+3]
     #     j += 1
     # print "Records: %d" % (j)
-    # d= device.run_data_bank_opcode(0x01) # 14
+    device.parse_bank1_data(device.run_data_bank_opcode(0x01))
+
     # for i in range(0, len(d), 14):
     #     print ["%02x" % x for x in d[i:i+14]]
     device.close()
