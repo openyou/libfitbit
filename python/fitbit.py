@@ -294,14 +294,27 @@ class FitBit(ANTlibusb):
         print ["0x%.02x" % x for x in data]
         # First 4 bytes are a time
         i = 0
+        last_date_time = 0
+        time_index = 0
         while i < len(data):
+            # Date is in bigendian. No, really. And I think it's
+            # because they're prefixing the 3 accelerometer reading
+            # bytes with 0x80, so they can & against it.
             if not data[i] & 0x80:
-                print "Time: %s" % (datetime.datetime.fromtimestamp(data[i+3] | data[i+2] << 8 | data[i+1] << 16 | data[i] << 24))
+                last_date_time = data[i+3] | data[i+2] << 8 | data[i+1] << 16 | data[i] << 24
+                print "Time: %s" % (datetime.datetime.fromtimestamp(last_date_time))
                 i = i + 4
+                time_index = 0
             else:
-                print "%s" % [data[i], data[i+1], data[i+2]]
+                # steps are easy. It's just the last byte
+                steps = data[i+2] 
+                # active score: second byte, subtract 10, divide by
+                # 10. I don't know why.
+                active_score = (data[i+1] - 10) / 10
+                # first byte: I don't know. It starts at 0x81. So we at least subtract that.
+                print "%s: ???: %d Active Score: %d Steps: %d" % ((datetime.datetime.fromtimestamp(last_date_time + 60 * time_index)), data[i] & 0x0f, data[i+1], data[i+2])
                 i = i + 3
-        
+                time_index = time_index + 1
         
         # Read 3's until we get another time?
         # for i in range(0, len(data), 13):
