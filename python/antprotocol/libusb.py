@@ -55,12 +55,15 @@ class ANTlibusb(ANT):
         self._connection = False
         self.timeout = 1000
 
-    def open(self, vid, pid):
+    def open(self, vid = None, pid = None):
+        if vid is None:
+            vid = self.VID
+        if pid is None:
+            pid = self.PID
         self._connection = usb.core.find(idVendor = vid,
                                          idProduct = pid)
         if self._connection is None:
             return False
-
         self._connection.set_configuration()
         return True
 
@@ -84,3 +87,6 @@ class ANTlibusb(ANT):
             self.data_received(''.join(map(chr, r)))
         return r
 
+    def reset_connection(self):
+        self._connection.reset()
+        # self._connection.set_configuration()
