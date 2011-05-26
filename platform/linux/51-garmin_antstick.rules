@@ -1,0 +1,1 @@
+SYSFS{idVendor}=="0fcf", SYSFS{idProduct}=="1008", MODE="666", SYMLINK+="garmin-ant_%k"
