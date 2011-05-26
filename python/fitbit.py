@@ -67,8 +67,8 @@
 # - Implementing data clearing
 
 import itertools, sys, random, operator, datetime
-from antprotocol.bases import FitBitANT
-from antprotocol.libusb import ANTlibusb
+from antprotocol.bases import FitBitANT, GarminANT
+from antprotocol.protocol import ANTReceiveException
 
 class FitBit(object):
     """Class to represent the fitbit tracker device, the portion of
@@ -164,7 +164,6 @@ class FitBit(object):
         self.base.open_channel()
 
     def init_tracker_for_transfer(self):
-        self.base.reset_connection()
         self.init_fitbit()
         self.wait_for_beacon()
         self.reset_tracker()
@@ -174,7 +173,7 @@ class FitBit(object):
         cid = [random.randint(0,254), random.randint(0,254)]
         self.base.send_acknowledged_data([0x78, 0x02] + cid + [0x00, 0x00, 0x00, 0x00])
         self.base.close_channel()
-        self.base.init_device_channel(cid + [0x01, 0x01])
+        self.init_device_channel(cid + [0x01, 0x01])
         self.wait_for_beacon()
         self.ping_tracker()
 
@@ -204,8 +203,8 @@ class FitBit(object):
     def run_opcode(self, opcode, payload = None):
         self.send_tracker_packet(opcode)
         data = self.base.receive_acknowledged_reply()
-        if data[0] != self.tracker.current_packet_id:
-            raise Exception("Tracker Packet IDs don't match! %02x %02x" % (data[0], self.tracker.current_packet_id))
+        if data[0] != self.current_packet_id:
+            raise Exception("Tracker Packet IDs don't match! %02x %02x" % (data[0], self.current_packet_id))
         if data[1] == 0x42:
             return self.get_data_bank()
         if data[1] == 0x61:
@@ -244,14 +243,14 @@ class FitBit(object):
         return data
 
     def send_tracker_packet(self, packet):
-        p = [self.tracker.gen_packet_id()] + packet
+        p = [self.gen_packet_id()] + packet
         self.base.send_acknowledged_data(p)
 
     def ping_tracker(self):
         self.base.send_acknowledged_data([0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
     def check_tracker_data_bank(self, index):
-        self.base.send_tracker_packet([0x60, 0x00, 0x02, index, 0x00, 0x00, 0x00])
+        self.send_tracker_packet([0x60, 0x00, 0x02, index, 0x00, 0x00, 0x00])
         return self._get_tracker_burst()
 
     def run_data_bank_opcode(self, index):
@@ -261,8 +260,8 @@ class FitBit(object):
         data = []
         while 1:
             try:
-                bank = self.check_tracker_data_bank(self.tracker.current_bank_id)
-                self.tracker.current_bank_id += 1
+                bank = self.check_tracker_data_bank(self.current_bank_id)
+                self.current_bank_id += 1
             except ANTReceiveException:
                 continue
             if len(bank) == 0:
@@ -312,7 +311,7 @@ class FitBit(object):
             print "Time: %s Daily Steps: %d" % (record_date, daily_steps) 
         
 def main():
-    base = FitBitANT(True)
+    base = GarminANT(True)
     if not base.open():
         print "No devices connected!"
         return 1
@@ -343,7 +342,7 @@ def main():
 
     # for i in range(0, len(d), 14):
     #     print ["%02x" % x for x in d[i:i+14]]
-    device.close()
+    base.close()
     return 0
 
 if __name__ == '__main__':

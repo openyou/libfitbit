@@ -10,6 +10,7 @@ class GarminANT(ANTlibusb):
     VID = 0x0fcf
     PID = 0x1008
 
+
 class FitBitANT(ANTlibusb):
     """Class that represents the fitbit base. Due to the extra
     hardware to handle tracker connection and charging, has an extra
@@ -29,6 +30,11 @@ class FitBitANT(ANTlibusb):
             return False
         self.init()
         return True
+    
+    def reset_connection(self):
+        super(FitBitANT, self).reset_connection()
+        self._connection.set_configuration()
+        self._receive()
 
     def init(self):
         # Device setup
