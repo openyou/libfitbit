@@ -2,28 +2,23 @@ from .protocol import ANTReceiveException
 from .libusb import ANTlibusb
 import usb
 
-class GarminANT(ANTlibusb):
-    """Class that represents the garmin USB stick base. Only needs to
-    set VID/PID.
+class DynastreamANT(ANTlibusb):
+    """Class that represents the Dynastream USB stick base, for
+    garmin/suunto equipment. Only needs to set VID/PID.
 
     """
     VID = 0x0fcf
     PID = 0x1008
 
-
 class FitBitANT(ANTlibusb):
     """Class that represents the fitbit base. Due to the extra
     hardware to handle tracker connection and charging, has an extra
-    initialiation sequence.
+    initialization sequence.
 
     """
 
     VID = 0x10c4
     PID = 0x84c4
-
-    def __init__(self, debug = False):
-        super(FitBitANT, self).__init__(debug=debug)
-        self.tracker = None
 
     def open(self, vid = None, pid = None):
         if not super(FitBitANT, self).open(vid, pid):
