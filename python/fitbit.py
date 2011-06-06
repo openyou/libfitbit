@@ -67,7 +67,7 @@
 # - Implementing data clearing
 
 import itertools, sys, random, operator, datetime
-from antprotocol.bases import FitBitANT, GarminANT
+from antprotocol.bases import FitBitANT, DynastreamANT
 from antprotocol.protocol import ANTReceiveException
 
 class FitBit(object):
@@ -311,7 +311,8 @@ class FitBit(object):
             print "Time: %s Daily Steps: %d" % (record_date, daily_steps) 
         
 def main():
-    base = GarminANT(True)
+    #base = DynastreamANT(True)
+    base = FitBitANT(debug=True)
     if not base.open():
         print "No devices connected!"
         return 1
