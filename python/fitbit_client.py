@@ -50,6 +50,7 @@ import urllib2
 import base64
 import xml.etree.ElementTree as et
 from fitbit import FitBit
+from antprotocol.bases import FitBitANT, DynastreamANT
 
 class FitBitResponse(object):
     def __init__(self, response):
@@ -64,7 +65,7 @@ class FitBitResponse(object):
             self.path = self.root.find("response").attrib["path"]
             if self.root.find("response").text:
                 # Quick and dirty url encode split
-                self.response = dict([x.split("=") for x in urllib.unquote(self.root.find("response/").text).split("&")])
+                self.response = dict([x.split("=") for x in urllib.unquote(self.root.find("response").text).split("&")])
 
         for opcode in self.root.findall("device/remoteOps/remoteOp"):
             op = {}
@@ -81,7 +82,12 @@ class FitBitClient(object):
 
     def __init__(self):
         self.info_dict = {}
-        self.fitbit = FitBit(True)
+        base = FitBitANT(debug=True)
+        if not base.open():
+            print "No devices connected!"
+            return 1
+
+        self.fitbit = FitBit(base)
         self.remote_info = None
 
     def form_base_info(self):
@@ -95,7 +101,6 @@ class FitBitClient(object):
             self.info_dict = dict(self.info_dict, **self.remote_info)
 
     def run_upload_request(self):
-        self.fitbit.open()
         self.fitbit.init_tracker_for_transfer()
 
         url = self.FITBIT_HOST + self.START_PATH

@@ -185,6 +185,7 @@ class FitBit(object):
         # FitBit device initialization
         while 1:
             try:
+                print "Waiting for receive"
                 d = self.base._receive()
                 if d[2] == 0x4E:
                     break
@@ -226,9 +227,9 @@ class FitBit(object):
             current_prefix = prefix.next()
             plist = []
             if i+8 >= len(payload):
-                plist += [(current_prefix + 0x80) | self._chan]
+                plist += [(current_prefix + 0x80) | self.base._chan]
             else:
-                plist += [current_prefix | self._chan]
+                plist += [current_prefix | self.base._chan]
             plist += map(ord, payload[i:i+8])
             while len(plist) < 9:
                 plist += [0x0]
@@ -321,24 +322,24 @@ def main():
 
     device.init_tracker_for_transfer()
 
-    # device.get_tracker_info()
+    device.get_tracker_info()
     # print device.tracker
 
     device.parse_bank2_data(device.run_data_bank_opcode(0x02))
     print "---"
     device.parse_bank0_data(device.run_data_bank_opcode(0x00))
-    # device.run_data_bank_opcode(0x04)
-    # d = device.run_data_bank_opcode(0x02) # 13
-    # for i in range(0, len(d), 13):
-    #     print ["%02x" % x for x in d[i:i+13]]
-    # d = device.run_data_bank_opcode(0x00) # 7
-    # print ["%02x" % x for x in d[0:7]]
-    # print ["%02x" % x for x in d[7:14]]
-    # j = 0
-    # for i in range(14, len(d), 3):
-    #     print d[i:i+3]
-    #     j += 1
-    # print "Records: %d" % (j)
+    device.run_data_bank_opcode(0x04)
+    d = device.run_data_bank_opcode(0x02) # 13
+    for i in range(0, len(d), 13):
+        print ["%02x" % x for x in d[i:i+13]]
+    d = device.run_data_bank_opcode(0x00) # 7
+    print ["%02x" % x for x in d[0:7]]
+    print ["%02x" % x for x in d[7:14]]
+    j = 0
+    for i in range(14, len(d), 3):
+        print d[i:i+3]
+        j += 1
+    print "Records: %d" % (j)
     device.parse_bank1_data(device.run_data_bank_opcode(0x01))
 
     # for i in range(0, len(d), 14):
