@@ -2,6 +2,6 @@ libfitbit ChangeLog
 =====================
 Numbers refer to bug listings in the tracking system - https://github.com/openyou/libfitbit/issues
 
-2010-02-07 Kyle Machulis <kyle@nonpolynomial.com>
+2011-02-07 Kyle Machulis <kyle@nonpolynomial.com>
 	* Release v0.0.1
 	* First version with working web sync, though not all steps run (can't burst data to device)

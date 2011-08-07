@@ -78,7 +78,6 @@ Don't even know if it works there yet. :D
 * Windows support
 * Finish figuring out data types
 * Implement library in C
-* Sync fitbit using any ANT receiver (pretty much done, just need to abstract receiver classes)
 
 == License ==
 
