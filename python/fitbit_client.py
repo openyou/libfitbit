@@ -126,11 +126,11 @@ class FitBitClient(object):
             else:
                 print "No URL returned. Quitting."
                 break
-        self.fitbit.close()
+        self.fitbit.base.close()
 
 def main():
     f = FitBitClient()
-    f.run_upload_request()
+    f.run_upload_request()    
     return 0
 
 if __name__ == '__main__':
