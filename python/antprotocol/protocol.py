@@ -126,10 +126,7 @@ class ANT(object):
     def _check_reset_response(self):
         data = self._receive()
 
-        # Sometimes we have to check for reset twice, if the first response is null
-        if len(data) == 0:
-            data = self._receive()
-
+        # Expect a startup message return
         if data[2] == 0x6f:
             return
         raise ANTStatusException("Reset expects message type 0x6f, got %02x" % (data[2]))
@@ -148,6 +145,9 @@ class ANT(object):
 
     def reset(self):
         self._send_message(0x4a, 0x00)
+        # According to protocol docs, the system will take a maximum
+        # of .5 seconds to restart
+        time.sleep(.6)
         self._check_reset_response()
 
     def set_channel_frequency(self, freq):
