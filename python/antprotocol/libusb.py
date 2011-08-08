@@ -64,8 +64,18 @@ class ANTlibusb(ANT):
                                          idProduct = pid)
         if self._connection is None:
             return False
-        
+
+        # For some reason, we have to set config, THEN reset,
+        # otherwise we segfault back in the ctypes (on linux, at
+        # least). 
         self._connection.set_configuration()
+        self._connection.reset()
+        # The we have to set our configuration again
+        self._connection.set_configuration()
+
+        # Then we should get back a reset check, with 0x80
+        # (SUSPEND_RESET) as our status
+        self._check_reset_response(0x80)
         return True
 
     def close(self):

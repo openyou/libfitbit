@@ -26,11 +26,6 @@ class FitBitANT(ANTlibusb):
         self.init()
         return True
     
-    def reset_connection(self):
-        super(FitBitANT, self).reset_connection()
-        self._connection.set_configuration()
-        self._receive()
-
     def init(self):
         # Device setup
         # bmRequestType, bmRequest, wValue, wIndex, data
