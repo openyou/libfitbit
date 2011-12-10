@@ -77,7 +77,8 @@ class FitBitResponse(object):
 
 class FitBitClient(object):
     CLIENT_UUID = "2ea32002-a079-48f4-8020-0badd22939e3"
-    FITBIT_HOST = "http://client.fitbit.com:80"
+    #FITBIT_HOST = "http://client.fitbit.com:80"
+    FITBIT_HOST = "https://client.fitbit.com"
     START_PATH = "/device/tracker/uploadData"
 
     def __init__(self):
