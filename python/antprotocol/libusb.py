@@ -75,7 +75,11 @@ class ANTlibusb(ANT):
 
         # Then we should get back a reset check, with 0x80
         # (SUSPEND_RESET) as our status
-        self._check_reset_response(0x80)
+        #
+        # I've commented this out because -- though it should just work
+        # it does seem to be causing some odd problems for me and does
+        # work with out it. Reed Wade - 31 Dec 2011
+        ##self._check_reset_response(0x80)
         return True
 
     def close(self):
