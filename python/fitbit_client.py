@@ -74,19 +74,30 @@ class FitBitResponse(object):
             if opcode.find("payloadData").text is not None:
                 op["payload"] = [x for x in base64.b64decode(opcode.find("payloadData").text)]
             self.opcodes.append(op)
+    
+    def __repr__(self):
+        return "<FitBitResponse object at 0x%x opcode=%s, response=%s>" % (id(self), str(self.opcodes), str(self.response))
 
 class FitBitClient(object):
     CLIENT_UUID = "2ea32002-a079-48f4-8020-0badd22939e3"
     #FITBIT_HOST = "http://client.fitbit.com:80"
-    FITBIT_HOST = "https://client.fitbit.com"
+    FITBIT_HOST = "https://client.fitbit.com" # only used for initial request
     START_PATH = "/device/tracker/uploadData"
 
     def __init__(self):
         self.info_dict = {}
         base = FitBitANT(debug=True)
-        if not base.open():
-            print "No devices connected!"
-            return 1
+        
+        for retries in (2,1,0):
+            try:
+                if not base.open():
+                    print "No devices connected!"
+                    return
+            except Exception, e:
+                print e
+                if retries:
+                    print "retrying"
+                    time.sleep(5)
 
         self.fitbit = FitBit(base)
         self.remote_info = None
@@ -95,8 +106,8 @@ class FitBitClient(object):
         self.info_dict.clear()
         self.info_dict["beaconType"] = "standard"
         self.info_dict["clientMode"] = "standard"
-        self.info_dict["clientVersion"] = "1.3.3"
-        self.info_dict["os"] = "Commodore 64"
+        self.info_dict["clientVersion"] = "1.0"
+        self.info_dict["os"] = "libfitbit"
         self.info_dict["clientId"] = self.CLIENT_UUID
         if self.remote_info:
             self.info_dict = dict(self.info_dict, **self.remote_info)
@@ -135,5 +146,26 @@ def main():
     return 0
 
 if __name__ == '__main__':
-    sys.exit(main())
+    import time
+    import traceback
+    
+    cycle_minutes = 15
+    
+    while True:
+        try:
+            main()
+        except Exception, e:
+            print "Failed with", e
+            print
+            print '-'*60
+            traceback.print_exc(file=sys.stdout)
+            print '-'*60
+            assert False
+        else:
+            print "normal finish"
+
+        print time.ctime(), "waiting", cycle_minutes, "minutes and then restarting..."
+        time.sleep(60*cycle_minutes)
+    
+    #sys.exit(main())
 

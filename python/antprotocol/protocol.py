@@ -74,7 +74,7 @@ class ANT(object):
 
     def data_received(self, data):
         if self._debug:
-            print "<-- " + hexRepr(data)
+            print "received: " + hexRepr(data)
 
         self._receiveBuffer.extend(list(struct.unpack('%sB' % len(data), data)))
 
@@ -126,6 +126,9 @@ class ANT(object):
     def _check_reset_response(self, status):
         data = self._receive()
 
+        if len(data) == 0:
+            raise ANTStatusException("No message response received from reset request.")
+
         # Expect a startup message return
         if data[2] == 0x6f and data[3] == status:
             return
@@ -144,47 +147,76 @@ class ANT(object):
         raise ANTStatusException("Message status %d does not match 0x0 (NO_ERROR)" % (status[5]))
 
     def reset(self):
+        if self._debug:
+            print "ANT.reset() requested"
         self._send_message(0x4a, 0x00)
         # According to protocol docs, the system will take a maximum
         # of .5 seconds to restart
-        time.sleep(.6)
+        #
+        # sleep time was 0.6, changed to 1.0 which reduces fail rate; a retry might
+        # be more sensible but wasn't sure if that might lead to possible duplicate 
+        # acknowledgements in the receive queue. A setting of 2.0 caused the interface 
+        # to not read fitbit devices. - Reed 31 Dec 2011
+        #
+        time.sleep(1.0)
+        #
         # This is a requested reset, so we expect back 0x20
         # (COMMAND_RESET)
         self._check_reset_response(0x20)
+        if self._debug:
+            print "ANT.reset() done"
 
     def set_channel_frequency(self, freq):
+        if self._debug:
+            print "ANT.set_channel_frequency()",freq
         self._send_message(0x45, self._chan, freq)
         self._check_ok_response()
 
     def set_transmit_power(self, power):
+        if self._debug:
+            print "ANT.set_transmit_power()", power
         self._send_message(0x47, 0x0, power)
         self._check_ok_response()
 
     def set_search_timeout(self, timeout):
+        if self._debug:
+            print "ANT.set_search_timeout()", self._chan, timeout
         self._send_message(0x44, self._chan, timeout)
         self._check_ok_response()
 
     def send_network_key(self, network, key):
+        if self._debug:
+            print "ANT.send_network_key()", network, key
         self._send_message(0x46, network, key)
         self._check_ok_response()
 
     def set_channel_period(self, period):
+        if self._debug:
+            print "ANT.set_channel_period()", self._chan, period
         self._send_message(0x43, self._chan, period)
         self._check_ok_response()
 
     def set_channel_id(self, id):
+        if self._debug:
+            print "ANT.set_channel_id()", self._chan, id
         self._send_message(0x51, self._chan, id)
         self._check_ok_response()
 
     def open_channel(self):
+        if self._debug:
+            print "ANT.open_channel()", self._chan
         self._send_message(0x4b, self._chan)
         self._check_ok_response()
 
     def close_channel(self):
+        if self._debug:
+            print "ANT.close_channel()", self._chan
         self._send_message(0x4c, self._chan)
         self._check_ok_response()
 
     def assign_channel(self):
+        if self._debug:
+            print "ANT.assign_channel()", self._chan
         self._send_message(0x42, self._chan, 0x00, 0x00)
         self._check_ok_response()
 
@@ -245,7 +277,7 @@ class ANT(object):
         self._transmitBuffer = map(chr, array.array('B', data + [reduce(operator.xor, data)]))
 
         if self._debug:
-            print "--> " + hexRepr(self._transmitBuffer)
+            print "    sent: " + hexRepr(self._transmitBuffer)
         return self._send(self._transmitBuffer)
 
     def _receive(self, size=4096):

@@ -183,9 +183,9 @@ class FitBit(object):
 
     def wait_for_beacon(self):
         # FitBit device initialization
-        while 1:
+        print "Waiting for receive"
+        while True:
             try:
-                print "Waiting for receive"
                 d = self.base._receive()
                 if d[2] == 0x4E:
                     break
