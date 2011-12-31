@@ -98,6 +98,8 @@ class FitBitClient(object):
                 if retries:
                     print "retrying"
                     time.sleep(5)
+                else:
+                    raise
 
         self.fitbit = FitBit(base)
         self.remote_info = None
@@ -160,7 +162,6 @@ if __name__ == '__main__':
             print '-'*60
             traceback.print_exc(file=sys.stdout)
             print '-'*60
-            assert False
         else:
             print "normal finish"
 
