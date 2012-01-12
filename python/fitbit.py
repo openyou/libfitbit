@@ -6,7 +6,7 @@
 #
 # Distributed as part of the libfitbit project
 #
-# Repo: http://www.github.com/openyou/libfitbit
+# Repo: http://www.github.com/qdot/libfitbit
 #
 # Licensed under the BSD License, as follows
 #
