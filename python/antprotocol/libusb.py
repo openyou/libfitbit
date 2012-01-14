@@ -41,9 +41,8 @@
 #################################################################
 #
 
-from protocol import ANT, ANTReceiveException
+from protocol import ANT
 import usb
-import operator
 
 class ANTlibusb(ANT):
     ep = { 'in'  : 0x81, \
@@ -92,12 +91,4 @@ class ANTlibusb(ANT):
         self._connection.write(self.ep['out'], map(ord, c), 0, 100)
 
     def _receive(self, size=4096):
-        r = self._connection.read(self.ep['in'], size, 0, self.timeout)
-        if len(r) == 0:
-            return r
-        checksum = reduce(operator.xor, r[:-1])
-        if checksum != r[-1]:
-            raise ANTReceiveException("Checksums for packet do not match received values!")
-        if self._debug:
-            self.data_received(''.join(map(chr, r)))
-        return r
+        return self._connection.read(self.ep['in'], size, 0, self.timeout)

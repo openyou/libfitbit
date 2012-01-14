@@ -186,7 +186,7 @@ class FitBit(object):
         print "Waiting for receive"
         while True:
             try:
-                d = self.base._receive()
+                d = self.base._receive_message()
                 if d[2] == 0x4E:
                     break
             except Exception:

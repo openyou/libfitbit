@@ -51,7 +51,7 @@ class ANTReceiveException(Exception):
     pass
 
 def hexList(data):
-    return map(lambda s: s.encode('HEX'), data)
+    return map(lambda s: chr(s).encode('HEX'), data)
 
 def hexRepr(data):
     return repr(hexList(data))
@@ -69,25 +69,7 @@ class ANT(object):
         self._chan = chan
 
         self._state = 0
-        self._transmitBuffer = []
         self._receiveBuffer = []
-
-    def data_received(self, data):
-        if self._debug:
-            print "received: " + hexRepr(data)
-
-        self._receiveBuffer.extend(list(struct.unpack('%sB' % len(data), data)))
-
-        if len(self._receiveBuffer) > 1 and self._receiveBuffer[0] == 0xa4:
-            messageSize = self._receiveBuffer[1]
-            totalMessageSize = messageSize + 4
-
-            if len(self._receiveBuffer) >= totalMessageSize:
-                message = self._receiveBuffer[:totalMessageSize]
-                self._receiveBuffer = self._receiveBuffer[totalMessageSize:]
-
-                if reduce(operator.xor, message[:-1]) != message[-1]:
-                    print "RCV CORRUPT MSG: %s" % hexRepr(intListToByteList(message))
 
     def _event_to_string(self, event):
         try:
@@ -124,7 +106,7 @@ class ANT(object):
             return "%02x" % event
 
     def _check_reset_response(self, status):
-        data = self._receive()
+        data = self._receive_message()
 
         if len(data) == 0:
             raise ANTStatusException("No message response received from reset request.")
@@ -136,7 +118,7 @@ class ANT(object):
 
     def _check_ok_response(self):
         # response packets will always be 7 bytes
-        status = self._receive()
+        status = self._receive_message()
 
         if len(status) == 0:
             raise ANTStatusException("No message response received!")
@@ -222,14 +204,14 @@ class ANT(object):
 
     def receive_acknowledged_reply(self, size = 13):        
         while 1:
-            status = self._receive()
+            status = self._receive_message()
             if len(status) > 0 and status[2] == 0x4F:
-                return status[4:-1].tolist()
+                return status[4:-1]
 
     def _check_acknowledged_response(self):
         # response packets will always be 7 bytes
         while 1:
-            status = self._receive()
+            status = self._receive_message()
             if len(status) > 0 and status[2] == 0x40 and status[5] == 0x5:
                 break
 
@@ -274,11 +256,65 @@ class ANT(object):
                 data.append(l)
         data.insert(0, len(data) - 1)
         data.insert(0, 0xa4)
-        self._transmitBuffer = map(chr, array.array('B', data + [reduce(operator.xor, data)]))
+        data.append(reduce(operator.xor, data))
 
         if self._debug:
-            print "    sent: " + hexRepr(self._transmitBuffer)
-        return self._send(self._transmitBuffer)
+            print "    sent: " + hexRepr(data)
+        return self._send(map(chr, array.array('B', data)))
+
+    def _find_sync(self, buf, start=0):
+        i = 0;
+        for v in buf:
+            if i >= start and (v == 0xa4 or v == 0xa5):
+                break
+            i = i + 1
+        if i != 0:
+            if self._debug:
+                print "Searching for SYNC, discarding: " + hexRepr(buf[0:i])
+            del buf[0:i]
+        return buf
+
+    def _receive_message(self):
+        timeouts = 0
+        data = self._receiveBuffer
+        l = 4 # Minimum packet size (SYNC, LEN, CMD, CKSM)
+        while True:
+            if len(data) < l:
+                from usb.core import USBError
+                try:
+                    data += self._receive().tolist()
+                    timeouts = 0
+                except USBError:
+                    timeouts = timeouts+1
+                    if timeouts > 3:
+                        # It looks like there isn't anything else coming.  Try
+                        # to find a plausable packet..
+                        data = self._find_sync(data)
+                        while len(data) > 1 and len(data) < data[1]+4:
+                            data = self._find_sync(data, 2)
+                        if len(data) == 0:
+                            # Failed to find anything..
+                            self._receiveBuffer = []
+                            return []
+                continue
+            data = self._find_sync(data)
+            if len(data) < l: continue
+            if data[1] < 0 or data[1] > 32:
+                # Length doesn't look "reasonable"
+                data = self._find_sync(data, 1)
+                continue
+            l = data[1] + 4
+            if len(data) < l: continue
+            p = data[0:l]
+            if reduce(operator.xor, p) != 0:
+                if self._debug:
+                    print "Checksum error for proposed packet: " + hexRepr(p)
+                data = self._find_sync(data, 1)
+                continue
+            self._receiveBuffer = data[l:]
+            if self._debug:
+                print "received: " + hexRepr(p)
+            return p
 
     def _receive(self, size=4096):
         raise Exception("Need to define _receive function for ANT child class!")
