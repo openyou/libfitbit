@@ -87,12 +87,13 @@ class FitBitClient(object):
     def __init__(self):
         self.info_dict = {}
         base = FitBitANT(debug=True)
-        
+        self.fitbit = FitBit(base)
+        self.remote_info = None
         for retries in (2,1,0):
             try:
                 if not base.open():
                     print "No devices connected!"
-                    return
+                    exit(1)
             except Exception, e:
                 print e
                 if retries:
@@ -100,9 +101,6 @@ class FitBitClient(object):
                     time.sleep(5)
                 else:
                     raise
-
-        self.fitbit = FitBit(base)
-        self.remote_info = None
 
     def form_base_info(self):
         self.info_dict.clear()
