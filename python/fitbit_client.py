@@ -113,31 +113,35 @@ class FitBitClient(object):
             self.info_dict = dict(self.info_dict, **self.remote_info)
 
     def run_upload_request(self):
-        self.fitbit.init_tracker_for_transfer()
+        try:
+            self.fitbit.init_tracker_for_transfer()
 
-        url = self.FITBIT_HOST + self.START_PATH
+            url = self.FITBIT_HOST + self.START_PATH
 
-        # Start the request Chain
-        self.form_base_info()
-        while url is not None:
-            res = urllib2.urlopen(url, urllib.urlencode(self.info_dict)).read()
-            print res
-            r = FitBitResponse(res)
-            self.remote_info = r.response
+            # Start the request Chain
             self.form_base_info()
-            op_index = 0
-            for o in r.opcodes:
-                self.info_dict["opResponse[%d]" % op_index] = base64.b64encode(''.join([chr(x) for x in self.fitbit.run_opcode(o["opcode"], o["payload"])]))
-                self.info_dict["opStatus[%d]" % op_index] = "success"
-                op_index += 1
-            urllib.urlencode(self.info_dict)
-            print self.info_dict
-            if r.host:
-                url = "http://%s%s" % (r.host, r.path)
-                print url
-            else:
-                print "No URL returned. Quitting."
-                break
+            while url is not None:
+                res = urllib2.urlopen(url, urllib.urlencode(self.info_dict)).read()
+                print res
+                r = FitBitResponse(res)
+                self.remote_info = r.response
+                self.form_base_info()
+                op_index = 0
+                for o in r.opcodes:
+                    self.info_dict["opResponse[%d]" % op_index] = base64.b64encode(''.join([chr(x) for x in self.fitbit.run_opcode(o["opcode"], o["payload"])]))
+                    self.info_dict["opStatus[%d]" % op_index] = "success"
+                    op_index += 1
+                urllib.urlencode(self.info_dict)
+                print self.info_dict
+                if r.host:
+                    url = "http://%s%s" % (r.host, r.path)
+                    print url
+                else:
+                    print "No URL returned. Quitting."
+                    break
+        except:
+            self.fitbit.base.close()
+            raise
         self.fitbit.base.close()
 
 def main():
