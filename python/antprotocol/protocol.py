@@ -224,17 +224,13 @@ class ANT(object):
 
     def _check_burst_response(self):
         response = []
-        failure = False
-        while 1:
-            try:
-                status = self._receive(15)
-            except ANTReceiveException:
-                failure = True
-            if len(status) > 0 and status[2] == 0x50 or status[2] == 0x4f:
-                response = response + status[4:-1].tolist()
+        while True:
+            status = self._receive_message()
+            if len(status) == 0:
+                raise ANTReceiveException("Burst receive failed!")
+            if status[2] == 0x50 or status[2] == 0x4f:
+                response = response + status[4:-1]
                 if (status[3] >> 4) > 0x8 or status[2] == 0x4f:
-                    if failure:
-                        raise ANTReceiveException("Burst receive failed!")
                     return response
 
     def send_acknowledged_data(self, l):
