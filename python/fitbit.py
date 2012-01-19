@@ -184,13 +184,14 @@ class FitBit(object):
     def wait_for_beacon(self):
         # FitBit device initialization
         print "Waiting for receive"
-        while True:
+        for tries in range(30):
             try:
                 d = self.base._receive_message()
                 if d[2] == 0x4E:
-                    break
+                    return
             except Exception:
                 pass
+        raise ANTReceiveException("Failed to see tracker beacon")
 
     def _get_tracker_burst(self):
         d = self.base._check_burst_response()
@@ -259,7 +260,7 @@ class FitBit(object):
 
     def get_data_bank(self):
         data = []
-        while 1:
+        for tries in range(100):
             try:
                 bank = self.check_tracker_data_bank(self.current_bank_id)
                 self.current_bank_id += 1
@@ -268,6 +269,7 @@ class FitBit(object):
             if len(bank) == 0:
                 return data
             data = data + bank
+        raise ANTReceiveException("Cannot complete data bank")
 
     def parse_bank2_data(self, data):
         for i in range(0, len(data), 13):
