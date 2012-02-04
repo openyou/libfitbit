@@ -202,25 +202,41 @@ class ANT(object):
         self._check_ok_response()
 
     def receive_acknowledged_reply(self, size = 13):
+        if self._debug:
+            print "Start receive_acknowledged_reply"
         for tries in range(30):
             status = self._receive_message(size)
             if len(status) > 4 and status[2] == 0x4F:
+                if self._debug:
+                    print "End receive_acknowledged_reply"
                 return status[4:-1]
+        if self._debug:
+            print "Fail receive_acknowledged_reply"
         raise ANTReceiveException("Failed to receive acknowledged reply")
 
     def _check_tx_response(self, maxtries = 16):
+        if self._debug:
+            print "Start _check_tx_response"
         for msgs in range(maxtries):
             status = self._receive_message()
             if len(status) > 5 and status[2] == 0x40:
                 if status[5] == 0x0a: # TX Start
                     continue
                 if status[5] == 0x05: # TX successful
+                    if self._debug:
+                        print "End _check_tx_response"
                     return;
                 if status[5] == 0x06: # TX failed
+                    if self._debug:
+                        print "Fail _check_tx_response"
                     raise ANTReceiveException("Transmission Failed")
+        if self._debug:
+            print "FailFinal _check_tx_response"
         raise ANTReceiveException("No Transmission Ack Seen")
 
     def _send_burst_data(self, data, sleep = None):
+        if self._debug:
+            print "Start _send_burst_data(%s)" % (data)
         for tries in range(2):
             for l in range(0, len(data), 9):            
                 self._send_message(0x50, data[l:l+9])
@@ -231,10 +247,16 @@ class ANT(object):
                 self._check_tx_response()
             except ANTReceiveException:
                 continue
+            if self._debug:
+                print "End _send_burst_data"
             return
+        if self._debug:
+            print "Fail _send_burst_data"
         raise ANTReceiveException("Failed to send burst data")
 
     def _check_burst_response(self):
+        if self._debug:
+            print "Start _check_burst_response"
         response = []
         for tries in range(16):
             status = self._receive_message()
@@ -242,21 +264,33 @@ class ANT(object):
                 raise ANTReceiveException("Burst receive failed by event!")
             elif len(status) > 4 and status[2] == 0x4f:
                 response = response + status[4:-1]
+                if self._debug:
+                    print "End _check_burst_response"
                 return response
             elif len(status) > 4 and status[2] == 0x50:
                 response = response + status[4:-1]
                 if status[3] & 0x80:
+                    if self._debug:
+                        print "End _check_burst_response"
                     return response
+        if self._debug:
+            print "Fail _check_burst_response"
         raise ANTReceiveException("Burst receive failed to detect end")
 
     def send_acknowledged_data(self, l):
+        if self._debug:
+            print "Start _send_acknowledged_data(%s)" % (l)
         for tries in range(8):
             try:
                 self._send_message(0x4f, self._chan, l)
                 self._check_tx_response()
             except ANTReceiveException:
                 continue
+            if self._debug:
+                print "End _send_acknowledged_data"
             return
+        if self._debug:
+            print "Fail _send_acknowledged_data"
         raise ANTReceiveException("Failed to send Acknowledged Data")
 
     def send_str(self, instring):
