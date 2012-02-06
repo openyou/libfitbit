@@ -184,13 +184,14 @@ class FitBit(object):
     def wait_for_beacon(self):
         # FitBit device initialization
         print "Waiting for receive"
-        while True:
+        for tries in range(30):
             try:
-                d = self.base._receive()
+                d = self.base._receive_message()
                 if d[2] == 0x4E:
-                    break
+                    return
             except Exception:
                 pass
+        raise ANTReceiveException("Failed to see tracker beacon")
 
     def _get_tracker_burst(self):
         d = self.base._check_burst_response()
@@ -202,21 +203,27 @@ class FitBit(object):
         return d[8:8+size]
 
     def run_opcode(self, opcode, payload = None):
-        self.send_tracker_packet(opcode)
-        data = self.base.receive_acknowledged_reply()
-        if data[0] != self.current_packet_id:
-            raise Exception("Tracker Packet IDs don't match! %02x %02x" % (data[0], self.current_packet_id))
-        if data[1] == 0x42:
-            return self.get_data_bank()
-        if data[1] == 0x61:
-            # Send payload data to device
-            if payload is not None:
-                self.send_tracker_payload(payload)
-            data = self.base.receive_acknowledged_reply()
+        for tries in range(4):
+            try:
+                self.send_tracker_packet(opcode)
+                data = self.base.receive_acknowledged_reply()
+            except:
+                continue
+            if data[0] != self.current_packet_id:
+                print "Tracker Packet IDs don't match! %02x %02x" % (data[0], self.current_packet_id)
+                continue
+            if data[1] == 0x42:
+                return self.get_data_bank()
+            if data[1] == 0x61:
+                # Send payload data to device
+                if payload is not None:
+                    self.send_tracker_payload(payload)
+                    data = self.base.receive_acknowledged_reply()
+                    if data[1] == 0x41:
+                        return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
             if data[1] == 0x41:
                 return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
-        if data[1] == 0x41:
-            return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+        raise Exception("Failed to run opcode %s" % (opcode))
 
     def send_tracker_payload(self, payload):
         # The first packet will be the packet id, the length of the
@@ -259,7 +266,7 @@ class FitBit(object):
 
     def get_data_bank(self):
         data = []
-        while 1:
+        for tries in range(100):
             try:
                 bank = self.check_tracker_data_bank(self.current_bank_id)
                 self.current_bank_id += 1
@@ -268,6 +275,7 @@ class FitBit(object):
             if len(bank) == 0:
                 return data
             data = data + bank
+        raise ANTReceiveException("Cannot complete data bank")
 
     def parse_bank2_data(self, data):
         for i in range(0, len(data), 13):
