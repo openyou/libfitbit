@@ -184,7 +184,7 @@ class FitBit(object):
     def wait_for_beacon(self):
         # FitBit device initialization
         print "Waiting for receive"
-        for tries in range(30):
+        for tries in range(75):
             try:
                 d = self.base._receive_message()
                 if d[2] == 0x4E:
