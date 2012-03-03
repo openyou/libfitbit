@@ -184,7 +184,7 @@ class FitBit(object):
     def wait_for_beacon(self):
         # FitBit device initialization
         print "Waiting for receive"
-        for tries in range(30):
+        for tries in range(75):
             try:
                 d = self.base._receive_message()
                 if d[2] == 0x4E:
@@ -219,10 +219,12 @@ class FitBit(object):
                 if payload is not None:
                     self.send_tracker_payload(payload)
                     data = self.base.receive_acknowledged_reply()
-                    if data[1] == 0x41:
-                        return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+                    data.pop(0)
+                    return data
+                raise Exception("run_opcode: opcode %s, no payload" % (opcode))
             if data[1] == 0x41:
-                return [0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
+                data.pop(0)
+                return data
         raise Exception("Failed to run opcode %s" % (opcode))
 
     def send_tracker_payload(self, payload):
@@ -257,8 +259,8 @@ class FitBit(object):
     def ping_tracker(self):
         self.base.send_acknowledged_data([0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
-    def check_tracker_data_bank(self, index):
-        self.send_tracker_packet([0x60, 0x00, 0x02, index, 0x00, 0x00, 0x00])
+    def check_tracker_data_bank(self, index, cmd):
+        self.send_tracker_packet([cmd, 0x00, 0x02, index, 0x00, 0x00, 0x00])
         return self._get_tracker_burst()
 
     def run_data_bank_opcode(self, index):
@@ -266,12 +268,11 @@ class FitBit(object):
 
     def get_data_bank(self):
         data = []
-        for tries in range(100):
-            try:
-                bank = self.check_tracker_data_bank(self.current_bank_id)
-                self.current_bank_id += 1
-            except ANTReceiveException:
-                continue
+        cmd = 0x70  # Send 0x70 on first burst
+        for parts in range(20):
+            bank = self.check_tracker_data_bank(self.current_bank_id, cmd)
+            self.current_bank_id += 1
+            cmd = 0x60  # Send 0x60 on subsequent bursts
             if len(bank) == 0:
                 return data
             data = data + bank

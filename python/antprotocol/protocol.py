@@ -258,7 +258,7 @@ class ANT(object):
         if self._debug:
             print "Start _check_burst_response"
         response = []
-        for tries in range(16):
+        for tries in range(128):
             status = self._receive_message()
             if len(status) > 5 and status[2] == 0x40 and status[5] == 0x4:
                 raise ANTReceiveException("Burst receive failed by event!")
