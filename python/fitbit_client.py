@@ -92,12 +92,12 @@ class FitBitClient(object):
         for base in [bc(debug=self.DEBUG) for bc in self.BASES]:
             for retries in (2,1,0):
                 try:
-                    if not base.open():
-                        break
-                    else:
+                    if base.open():
                         print "Found %s base" % (base.NAME,)
                         self.fitbit = FitBit(base)
                         self.remote_info = None
+                        break
+                    else:
                         break
                 except Exception, e:
                     print e
