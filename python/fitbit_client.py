@@ -84,12 +84,12 @@ class FitBitClient(object):
     FITBIT_HOST = "https://client.fitbit.com" # only used for initial request
     START_PATH = "/device/tracker/uploadData"
     DEBUG = True
+    BASES = [FitBitANT, DynastreamANT]
 
     def __init__(self):
         self.info_dict = {}
         self.fitbit = None
-        bases = [FitBitANT(debug=self.DEBUG), DynastreamANT(debug=self.DEBUG)]
-        for base in bases:
+        for base in [bc(debug=self.DEBUG) for bc in self.BASES]:
             for retries in (2,1,0):
                 try:
                     if not base.open():
