@@ -106,6 +106,8 @@ class FitBitClient(object):
                         time.sleep(5)
             else:
                 raise
+            if self.fitbit:
+                break
         if not self.fitbit:
             print "No devices connected!"
             exit(1)
