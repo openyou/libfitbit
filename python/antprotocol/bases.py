@@ -9,6 +9,7 @@ class DynastreamANT(ANTlibusb):
     """
     VID = 0x0fcf
     PID = 0x1008
+    NAME = "Dynastream"
 
 class FitBitANT(ANTlibusb):
     """Class that represents the fitbit base. Due to the extra
@@ -19,6 +20,7 @@ class FitBitANT(ANTlibusb):
 
     VID = 0x10c4
     PID = 0x84c4
+    NAME = "FitBit"
 
     def open(self, vid = None, pid = None):
         if not super(FitBitANT, self).open(vid, pid):

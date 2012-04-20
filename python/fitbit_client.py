@@ -83,24 +83,34 @@ class FitBitClient(object):
     #FITBIT_HOST = "http://client.fitbit.com:80"
     FITBIT_HOST = "https://client.fitbit.com" # only used for initial request
     START_PATH = "/device/tracker/uploadData"
+    DEBUG = True
+    BASES = [FitBitANT, DynastreamANT]
 
     def __init__(self):
         self.info_dict = {}
-        base = FitBitANT(debug=True)
-        self.fitbit = FitBit(base)
-        self.remote_info = None
-        for retries in (2,1,0):
-            try:
-                if not base.open():
-                    print "No devices connected!"
-                    exit(1)
-            except Exception, e:
-                print e
-                if retries:
-                    print "retrying"
-                    time.sleep(5)
-                else:
-                    raise
+        self.fitbit = None
+        for base in [bc(debug=self.DEBUG) for bc in self.BASES]:
+            for retries in (2,1,0):
+                try:
+                    if base.open():
+                        print "Found %s base" % (base.NAME,)
+                        self.fitbit = FitBit(base)
+                        self.remote_info = None
+                        break
+                    else:
+                        break
+                except Exception, e:
+                    print e
+                    if retries:
+                        print "retrying"
+                        time.sleep(5)
+            else:
+                raise
+            if self.fitbit:
+                break
+        if not self.fitbit:
+            print "No devices connected!"
+            exit(1)
 
     def form_base_info(self):
         self.info_dict.clear()
