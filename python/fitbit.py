@@ -281,7 +281,7 @@ class FitBit(object):
     def parse_bank2_data(self, data):
         for i in range(0, len(data), 13):
             print ["0x%.02x" % x for x in data[i:i+13]]
-            # First 4 bytes are seconds from Jan 1, 1980
+            # First 4 bytes are seconds from Jan 1, 1970
             print "Time: %s" % (datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24))
 
     def parse_bank0_data(self, data):
@@ -315,7 +315,7 @@ class FitBit(object):
     def parse_bank1_data(self, data):
         for i in range(0, len(data), 14):
             print ["0x%.02x" % x for x in data[i:i+13]]
-            # First 4 bytes are seconds from Jan 1, 1980
+            # First 4 bytes are seconds from Jan 1, 1970
             daily_steps = data[i+7] << 8 | data[i+6]
             record_date = datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24)
             print "Time: %s Daily Steps: %d" % (record_date, daily_steps) 
