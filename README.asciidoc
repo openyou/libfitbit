@@ -65,8 +65,20 @@ checked in shortly.
 
 === OS X ===
 
-None known yet. Shouldn't require anything out of the ordinary since
-it's not an HID device.
+FitBit original driver is claiming the device resulting in premission errors
+when libusb wants to claims it.
+
+A solution that works everytime is simply to disable the driver by renaming
+it:
+
+----
+cd /System/Library/Extensions
+sudo mv SiLabsUSBDriver.kext SiLabsUSBDriver.kext.disabled
+----
+
+And reboot.
+
+To re-enable it, just rename it again, and reboot again.
 
 === Windows ===
 
