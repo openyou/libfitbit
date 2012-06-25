@@ -71,10 +71,10 @@ when libusb wants to claims it.
 A solution that works everytime is simply to disable the driver by renaming
 it:
 
----
+----
 cd /System/Library/Extensions
 sudo mv SiLabsUSBDriver.kext SiLabsUSBDriver.kext.disabled
----
+----
 
 And reboot.
 
