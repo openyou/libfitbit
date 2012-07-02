@@ -319,6 +319,18 @@ class FitBit(object):
             daily_steps = data[i+7] << 8 | data[i+6]
             record_date = datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24)
             print "Time: %s Daily Steps: %d" % (record_date, daily_steps) 
+
+    def parse_bank6_data(self, data):
+        i = 0
+        while i < len(data):
+            if data[i] == 0x80:
+                print ["0x%.02x" % x for x in data[i:i+1] # 0x80 0x0a for me
+                i += 2
+                continue
+            d = data[i:i+4]
+            tstamp = d[3] | d[2] << 8 | d[1] << 16 | d[0] << 24
+            print "Time: %s" % datetime.datetime.fromtimestamp(tstamp)
+            i += 4
         
 def main():
     #base = DynastreamANT(True)
