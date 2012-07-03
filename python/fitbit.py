@@ -324,7 +324,7 @@ class FitBit(object):
         i = 0
         while i < len(data):
             if data[i] == 0x80:
-                print ["0x%.02x" % x for x in data[i:i+1] # 0x80 0x0a for me
+                print ["0x%.02x" % x for x in data[i:i+1]] # 0x80 0x0a for me
                 i += 2
                 continue
             d = data[i:i+4]
