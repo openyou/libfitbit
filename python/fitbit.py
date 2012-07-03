@@ -322,14 +322,16 @@ class FitBit(object):
 
     def parse_bank6_data(self, data):
         i = 0
+        tstamp = 0
         while i < len(data):
             if data[i] == 0x80:
-                print ["0x%.02x" % x for x in data[i:i+1]] # 0x80 0x0a for me
+                floors = data[i+1] / 10
+                print "Time: %s: %d Floors" % (datetime.datetime.fromtimestamp(tstamp), floors)
                 i += 2
+                tstamp += 60
                 continue
             d = data[i:i+4]
             tstamp = d[3] | d[2] << 8 | d[1] << 16 | d[0] << 24
-            print "Time: %s" % datetime.datetime.fromtimestamp(tstamp)
             i += 4
         
 def main():
