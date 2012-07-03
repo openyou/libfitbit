@@ -266,6 +266,15 @@ class FitBit(object):
     def run_data_bank_opcode(self, index):
         return self.run_opcode([0x22, index, 0x00, 0x00, 0x00, 0x00, 0x00])
 
+    def erase_data_bank(self, index, tstamp=None):
+        if tstamp is None: tstamp = int(time.time())
+        return self.run_opcode([0x25, index,
+                                (tstamp & 0xff000000) >> 24,
+                                (tstamp & 0x00ff0000) >> 16,
+                                (tstamp & 0x0000ff00) >> 8,
+                                (tstamp & 0x000000ff),
+                                0x00])
+
     def get_data_bank(self):
         data = []
         cmd = 0x70  # Send 0x70 on first burst
