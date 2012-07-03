@@ -66,7 +66,7 @@
 # - Figuring out more data formats and packets
 # - Implementing data clearing
 
-import itertools, sys, random, operator, datetime
+import itertools, sys, random, operator, datetime, time
 from antprotocol.bases import FitBitANT, DynastreamANT
 from antprotocol.protocol import ANTReceiveException
 
