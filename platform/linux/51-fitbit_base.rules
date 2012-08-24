@@ -1,1 +1,0 @@
-SYSFS{idVendor}=="10c4", SYSFS{idProduct}=="84c4", MODE="666", SYMLINK+="fitbit-ant_%k"
