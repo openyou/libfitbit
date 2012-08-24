@@ -120,7 +120,7 @@ class FitBit(object):
 
     def parse_info_packet(self, data):
         """Parses the information gotten from the 0x24 retrieval command"""
-        
+
         self.serial = data[0:5]
         self.firmware_version = data[5]
         self.bsl_major_version = data[6]
@@ -310,7 +310,7 @@ class FitBit(object):
             else:
                 record_date = (datetime.datetime.fromtimestamp(last_date_time + 60 * time_index))
                 # steps are easy. It's just the last byte
-                steps = data[i+2] 
+                steps = data[i+2]
                 # active score: second byte, subtract 10 (because METs
                 # start at 1 but 1 is subtracted per minute, see
                 # asterisk note on fitbit website, divide by 10.
@@ -319,7 +319,7 @@ class FitBit(object):
                 not_sure = data[i] - 0x81
                 print "%s: ???: %d Active Score: %f Steps: %d" % (record_date, not_sure, active_score, steps)
                 i = i + 3
-                time_index = time_index + 1        
+                time_index = time_index + 1
 
     def parse_bank1_data(self, data):
         for i in range(0, len(data), 14):
@@ -327,7 +327,7 @@ class FitBit(object):
             # First 4 bytes are seconds from Jan 1, 1970
             daily_steps = data[i+7] << 8 | data[i+6]
             record_date = datetime.datetime.fromtimestamp(data[i] | data[i + 1] << 8 | data[i + 2] << 16 | data[i + 3] << 24)
-            print "Time: %s Daily Steps: %d" % (record_date, daily_steps) 
+            print "Time: %s Daily Steps: %d" % (record_date, daily_steps)
 
     def parse_bank6_data(self, data):
         i = 0
@@ -342,7 +342,7 @@ class FitBit(object):
             d = data[i:i+4]
             tstamp = d[3] | d[2] << 8 | d[1] << 16 | d[0] << 24
             i += 4
-        
+
 def main():
     #base = DynastreamANT(True)
     base = FitBitANT(debug=True)
