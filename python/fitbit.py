@@ -278,7 +278,7 @@ class FitBit(object):
     def get_data_bank(self):
         data = []
         cmd = 0x70  # Send 0x70 on first burst
-        for parts in range(20):
+        for parts in range(2000):
             bank = self.check_tracker_data_bank(self.current_bank_id, cmd)
             self.current_bank_id += 1
             cmd = 0x60  # Send 0x60 on subsequent bursts
