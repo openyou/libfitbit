@@ -179,8 +179,7 @@ if __name__ == '__main__':
             print '-'*60
         else:
             print "normal finish"
-            print time.ctime(), "waiting", cycle_minutes, "minutes and then restarting..."
-            time.sleep(60*cycle_minutes)
+            print "restarting..."
     
     #sys.exit(main())
 
