@@ -154,6 +154,7 @@ class FitBitClient(object):
         except:
             self.fitbit.base.close()
             raise
+        self.fitbit.command_sleep()
         self.fitbit.base.close()
 
 def main():
