@@ -181,6 +181,9 @@ class FitBit(object):
         # 0x78 0x01 is apparently the device reset command
         self.base.send_acknowledged_data([0x78, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
+    def command_sleep(self):
+        self.base.send_acknowledged_data([0x7f, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3c])
+
     def wait_for_beacon(self):
         # FitBit device initialization
         print "Waiting for receive"
