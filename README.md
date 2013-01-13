@@ -1,21 +1,26 @@
-= libfitbit =
+libfitbit
+=========
 
 by Kyle Machulis <kyle@nonpolynomial.com>
 
-Nonpolynomial Labs - http://www.nonpolynomial.com
+Nonpolynomial Labs - [http://www.nonpolynomial.com](http://www.nonpolynomial.com)
 
 libfitbit is part of the OpenYou project for Open Source Health
-Hardware access - http://openyou.org
+Hardware access - [http://openyou.org](http://openyou.org)
 
 If you find libfitbit useful, please donate to the project at
-http://pledgie.com/campaigns/14375
+[http://pledgie.com/campaigns/14375](http://pledgie.com/campaigns/14375)
 
-== Credits and Thanks ==
+
+Credits and Thanks
+------------------
 
 Thanks to Matt Cutts for hooking me up with the hardware -
 http://www.twitter.com/mattcutts
 
-== Description ==
+
+Description
+-----------
 
 libfitbit is an implementation of the data retrieval protocol for the
 fitbit health tracking device. It also implements a synchronization
@@ -38,32 +43,40 @@ be used for implementing the protocol in new languages without having
 to read code (not that my ability to convey the protocol in english is
 all that clear).
 
-== Package Information ==
 
-Source repo @ http://www.github.com/qdot/libfitbit
+Package Information
+-------------------
 
-== Platform Support ==
+Source repo @ [http://www.github.com/qdot/libfitbit](http://www.github.com/qdot/libfitbit)
+
+
+Platform Support
+----------------
 
 * Linux - Tested on Ubuntu 10.10
 * OS X - Untested, should work?
 * Windows - Won't work at the moment. May be able to create serial
   interface to talk to CP2012 chip? Haven't done research yet.
 
-== Library Requirements ==
+
+Library Requirements
+--------------------
 
 * Python - http://www.python.org
 * libusb-1.0 - http://www.libusb.org
 * pyusb 1.0+ - http://sourceforge.net/projects/pyusb/files/
 
-== Platform Cavaets ==
 
-=== Linux ===
+Platform Cavaets
+----------------
+
+### Linux
 
 You'll need to either run as root or set up a udev rule to switch out
 permissions on the base VID/PID. We'll hopefully have a udev rule
 checked in shortly.
 
-=== OS X ===
+### OS X
 
 FitBit original driver is claiming the device resulting in premission errors
 when libusb wants to claims it.
@@ -71,29 +84,33 @@ when libusb wants to claims it.
 A solution that works everytime is simply to disable the driver by renaming
 it:
 
-----
+```bash
 cd /System/Library/Extensions
 sudo mv SiLabsUSBDriver.kext SiLabsUSBDriver.kext.disabled
-----
+```
 
 And reboot.
 
 To re-enable it, just rename it again, and reboot again.
 
-=== Windows ===
+### Windows
 
 Don't even know if it works there yet. :D
 
-== Future Plans ==
+
+Future Plans
+------------
 
 * Breaking ANT access library out into its own repo
 * Windows support
 * Finish figuring out data types
 * Implement library in C
 
-== License ==
 
----------------------
+License
+-------
+
+```
 Copyright (c) 2011, Kyle Machulis/Nonpolynomial Labs
 All rights reserved.
 
@@ -126,4 +143,4 @@ HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR 
 OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, 
 EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
----------------------
+```
