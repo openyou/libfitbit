@@ -11,6 +11,10 @@ Hardware access - [http://openyou.org](http://openyou.org)
 If you find libfitbit useful, please donate to the project at
 [http://pledgie.com/campaigns/14375](http://pledgie.com/campaigns/14375)
 
+**WARNING:** This project is **only** for the ANT based **Fitbit Ultra**
+tracker. Newer trackers like the One, the Zip, the Flex, the Force and
+maybe upcoming ones use the bluetooth protocol, and are thus incompatible
+with this project.
 
 Credits and Thanks
 ------------------
