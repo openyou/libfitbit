@@ -16,7 +16,7 @@ USB, as well as synchronizing with fitbit's web service.
 
 We recommend the following references to go along with this document:
 
-- ANT Message and Protocol Documentation: http://www.thisisant.com/images/Resources/PDF/1204662412_ant%20message%20protocol%20and%20usage.pdf
+- ANT Message and Protocol Documentation: http://www.thisisant.com/resources/ant-message-protocol-and-usage/D00000652_ANT_Message_Protocol_and_Usage_Rev_5.1.pdf
 - FitBit FAQ: http://www.fitbit.com/faq
 - FitBit Manual: http://www.fitbit.com/manual
 
