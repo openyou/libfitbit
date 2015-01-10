@@ -13,10 +13,10 @@
 # with or without modification, are permitted provided 
 # that the following conditions are met:
 #
-#    * Redistributions of source code must retain the 
-#      above copyright notice, this list of conditions 
+#    * Redistributions of source code must retain the
+#      above copyright notice, this list of conditions
 #      and the following disclaimer.
-#    * Redistributions in binary form must reproduce the 
+#    * Redistributions in binary form must reproduce the
 #      above copyright notice, this list of conditions and 
 #      the following disclaimer in the documentation and/or 
 #      other materials provided with the distribution.
@@ -44,23 +44,24 @@
 from protocol import ANT
 import usb
 
+
 class ANTlibusb(ANT):
-    ep = { 'in'  : 0x81, \
-           'out' : 0x01
-           }
+    ep = {'in': 0x81,
+          'out': 0x01
+          }
 
     def __init__(self, chan=0x0, debug=False):
         super(ANTlibusb, self).__init__(chan, debug)
         self._connection = False
         self.timeout = 1000
 
-    def open(self, vid = None, pid = None):
+    def open(self, vid=None, pid=None):
         if vid is None:
             vid = self.VID
         if pid is None:
             pid = self.PID
-        self._connection = usb.core.find(idVendor = vid,
-                                         idProduct = pid)
+        self._connection = usb.core.find(idVendor=vid,
+                                         idProduct=pid)
         if self._connection is None:
             return False
 
@@ -88,7 +89,7 @@ class ANTlibusb(ANT):
     def _send(self, command):
         # libusb expects ordinals, it'll redo the conversion itself.
         c = command
-        self._connection.write(self.ep['out'], map(ord, c), 0, 100)
+        self._connection.write(self.ep['out'], map(ord, c), 100)
 
     def _receive(self, size=4096):
-        return self._connection.read(self.ep['in'], size, 0, self.timeout)
+        return self._connection.read(self.ep['in'], size, self.timeout)
