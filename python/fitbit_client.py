@@ -133,7 +133,9 @@ class FitBitClient(object):
             # Start the request Chain
             self.form_base_info()
             while url is not None:
-                res = urllib2.urlopen(url, urllib.urlencode(self.info_dict)).read()
+                req = urllib2.Request(url, urllib.urlencode(self.info_dict))
+                req.add_header("User-Agent", "FitBit Client")
+                res = urllib2.urlopen(req).read()
                 print res
                 r = FitBitResponse(res)
                 self.remote_info = r.response
